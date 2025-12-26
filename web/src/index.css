@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Leaflet + Tailwind の相性対策（地図タイル/アイコンが崩れる時用） */
+.leaflet-container img {
+  max-width: none !important;
+}

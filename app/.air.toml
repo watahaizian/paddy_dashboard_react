@@ -1,0 +1,14 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/server ."
+  bin = "./tmp/server"
+  include_ext = ["go"]
+  exclude_dir = ["tmp", "vendor"]
+
+  poll = true
+  poll_interval = 500
+
+[log]
+  time = true
