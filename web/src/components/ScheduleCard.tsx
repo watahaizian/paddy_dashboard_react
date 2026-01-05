@@ -1,3 +1,4 @@
+// src/components/ScheduleCard.tsx
 import SectionTitle from "./SectionTitle.tsx";
 
 const ScheduleCard = () => {

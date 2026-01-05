@@ -1,3 +1,4 @@
+// src/components/MapSection.tsx
 import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import { FaSun, FaThermometerHalf, FaTint } from "react-icons/fa";
 import L from "leaflet";
@@ -10,7 +11,6 @@ type Props = {
 };
 
 const pin = (color: string, size: number) => {
-  // 画像依存を避けるため divIcon（Windows+Viteでも安定）
   return L.divIcon({
     className: "",
     html: `<div style="
@@ -39,7 +39,6 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
 
   return (
     <div style={{ border: "1px solid #BFCBDA", borderRadius: 16, overflow: "hidden", background: "white", height: "100%" }}>
-      {/* ヘッダ行（Flutterの見た目に寄せた枠。中身は後で実装でOK） */}
       <div style={{ background: "#E2EEF8", padding: "10px 14px", fontWeight: 700, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
         <div>エリア名</div>
 
@@ -60,7 +59,7 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
       </div>
       <div style={{ borderTop: "1px solid #BFCBDA", height: "calc(100% - 44px)" }}>
         <MapContainer
-          key={selected.id} // 選択変わったら中心を切り替えたいので key で作り直す
+          key={selected.id}
           center={[selected.lat, selected.lon]}
           zoom={15.6}
           style={{ height: "100%", width: "100%" }}

@@ -1,3 +1,4 @@
+// src/components/ChartsPanel.tsx
 import type { FieldDataResponse } from "../types";
 import {
   LineChart,
@@ -49,7 +50,6 @@ const ChartsPanel = ({ title, data, loading, error }: Props) => {
     );
   }
 
-  // recharts は undefined を描かないので、そのままOK
   const chartData = data.points.map((p) => ({
     t: p.t,
     waterCm: p.waterCm,

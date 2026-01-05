@@ -1,3 +1,4 @@
+// src/App.tsx
 import { useEffect, useMemo, useState } from "react";
 import type { Field, FieldDataResponse } from "./types";
 import { fetchFieldData, fetchFields } from "./api";
@@ -24,7 +25,6 @@ const App = () => {
   const [loadingData, setLoadingData] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
 
-  // fields取得（StrictModeの2回実行でもAbortErrorで壊れない）
   useEffect(() => {
     let alive = true;
     const ac = new AbortController();
@@ -125,19 +125,14 @@ const App = () => {
     );
   }
 
-  // Flutterの padding: horizontal 32, vertical 24
   return (
     <div className="min-h-screen bg-slate-100">
-      {/* AppBar: 高さ64 */}
       <header className="h-16 bg-slate-800 text-white flex items-center px-6 font-black tracking-widest">
         圃場水管理ダッシュボード
       </header>
 
-      {/* 本体: Flutterと同じ余白＆gap */}
       <main className="px-8 py-6">
-        {/* Flutter: isCompact = width < 960 */}
         <div className="block min-[960px]:hidden space-y-6">
-          {/* Map: 高さ 40% っぽく（Flutterは constraints *0.4） */}
           <div className="h-[40vh] min-h-[320px]">
             <MapSection
               fields={fields}
@@ -146,12 +141,10 @@ const App = () => {
             />
           </div>
 
-          {/* Bottom summary: 高さ200（モバイルでは地図の直下に表示） */}
           <div className="h-[200px]">
             <BottomSummarySection isCompact />
           </div>
 
-          {/* 詳細: Expanded + 中スクロール（FlutterのClipRRect+SingleChildScrollView相当） */}
           <div className="bg-white border rounded-2xl overflow-hidden">
             <div className="p-4 max-h-[50vh] overflow-auto">
               <FieldDetailSection
@@ -167,9 +160,7 @@ const App = () => {
           </div>
         </div>
 
-        {/* PCレイアウト: 左7 / 右5（FlutterのRow+Expanded） */}
         <div className="hidden min-[960px]:flex gap-6 h-[calc(100vh-64px-48px)] min-h-0">
-          {/* 左: flex 7 */}
           <div className="flex-[7] min-w-0 flex flex-col gap-6 min-h-0">
             <div className="flex-1 min-h-0">
               <MapSection
@@ -183,7 +174,6 @@ const App = () => {
             </div>
           </div>
 
-          {/* 右: flex 5（Flutterの詳細） */}
           <div className="flex-[5] min-w-0 min-h-0 overflow-auto">
             <FieldDetailSection
               isCompact={false}

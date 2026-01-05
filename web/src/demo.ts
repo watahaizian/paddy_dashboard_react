@@ -70,7 +70,6 @@ export function makeDemoFieldData(padId: string, hours = 24): FieldDataResponse 
     });
   }
 
-  // ✅ nullは返さない（無いときは last を省略）
   const last = points.length ? points[points.length - 1] : undefined;
   return last ? { points, last } : { points };
 }

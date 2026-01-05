@@ -1,3 +1,4 @@
+// src/components/InfoCard.tsx
 import SectionTitle from "./SectionTitle.tsx";
 
 type Row = { label: string; value: string };

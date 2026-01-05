@@ -1,3 +1,4 @@
+// src/components/BottomSummarySection.tsx
 type Props = { isCompact: boolean };
 
 const cards = [
@@ -8,7 +9,6 @@ const cards = [
 
 const BottomSummarySection = ({ isCompact }: Props) => {
   if (isCompact) {
-    // Flutter: Wrap(spacing:16, runSpacing:16)
     return (
       <div className="h-full flex flex-wrap gap-4">
         {cards.map((c) => (
@@ -18,7 +18,6 @@ const BottomSummarySection = ({ isCompact }: Props) => {
     );
   }
 
-  // Flutter: Row + Expandedで3枚
   return (
     <div className="h-full grid grid-cols-3 gap-4">
       {cards.map((c) => (

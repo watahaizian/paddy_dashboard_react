@@ -1,3 +1,4 @@
+// src/components/SensorStatusCard.tsx
 import type { FieldDataResponse } from "../types";
 
 type Props = {

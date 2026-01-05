@@ -30,7 +30,7 @@ type Point struct {
 	WaterCm  *float64 `json:"waterCm,omitempty"`
 	Temp     *float64 `json:"temp,omitempty"`
 	Battery  *float64 `json:"battery,omitempty"`
-	Measured string   `json:"measured,omitempty"` // 参考用
+	Measured string   `json:"measured,omitempty"`
 }
 
 type FieldDataResponse struct {
@@ -42,7 +42,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
-	// Hello world（ブラウザで見えるやつ）
+	// Hello world
 	r.GET("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8",
 			[]byte("<h1>Hello world</h1><p>Gin + Nginx + Docker</p>"))
@@ -63,9 +63,7 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"you_sent": req.Text})
 	})
 
-	// ===== ここから本題：FlutterのAPI移植 =====
-
-	// 圃場一覧（正規化）
+	// 圃場一覧
 	r.GET("/api/fields", func(c *gin.Context) {
 		base := upstreamBaseURL()
 		endpoint := base + "/app/paddy/get_devices"
@@ -99,19 +97,16 @@ func main() {
 			return
 		}
 
-		// Flutter版と同じ：最低3件になるようにダミー追加（不要なら消してOK）
 		fields = ensureAtLeast3(fields)
 
 		c.JSON(http.StatusOK, fields)
 	})
 
-	// 圃場データ（正規化）
-	// 例: /api/fields/xxx/data?from=2025-12-22T00:00:00+09:00&to=2025-12-23T00:00:00+09:00
+	// 圃場データ
 	r.GET("/api/fields/:id/data", func(c *gin.Context) {
 		padID := c.Param("id")
 		loc := mustTokyoLocation()
 
-		// from/to がなければ直近24h
 		now := time.Now().In(loc)
 		from, to := parseRange(c.Query("from"), c.Query("to"), now, loc)
 
@@ -238,7 +233,6 @@ func parseDeviceDataPoint(m map[string]any, loc *time.Location) (Point, bool) {
 		Measured: measuredRaw,
 	}
 
-	// waterlevel: mm -> cm
 	if v := parseDouble(firstNonNil(m, "waterlevel")); v != nil {
 		cm := *v / 10.0
 		p.WaterCm = &cm
@@ -327,7 +321,6 @@ func parseDouble(v any) *float64 {
 		}
 		return nil
 	default:
-		// たまに数値っぽい型が混ざるので最後の悪あがき
 		s := stringify(x)
 		f, err := strconv.ParseFloat(s, 64)
 		if err == nil {
@@ -360,18 +353,15 @@ func parseRange(fromQ, toQ string, now time.Time, loc *time.Location) (time.Time
 		}
 	}
 	if to.Before(from) {
-		// 入れ替え
 		from, to = to, from
 	}
 	return from, to
 }
 
-// upstreamが欲しがる形式：yyyy-MM-dd HH:mm:ss
 func formatUpstreamTime(t time.Time) string {
 	return t.Format("2006-01-02 15:04:05")
 }
 
-// 受け取りは柔軟に（ISO/RFC3339、"yyyy-MM-dd HH:mm:ss"、epoch millis）
 func parseTimeFlex(s string, loc *time.Location) (time.Time, bool) {
 	// epoch millis
 	if ms, err := strconv.ParseInt(s, 10, 64); err == nil && ms > 1_000_000_000_000 {

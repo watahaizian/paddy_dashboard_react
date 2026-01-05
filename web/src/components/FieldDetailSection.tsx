@@ -1,3 +1,4 @@
+// src/components/FieldDetailSection.tsx
 import type { Field, FieldDataResponse } from "../types";
 import ChartsAndStatusPanel from "./ChartsAndStatusPanel.tsx";
 import ScheduleCard from "./ScheduleCard.tsx";
@@ -64,7 +65,6 @@ const FieldDetailSection = ({
       );
     }
 
-    // PCは横2枚
     return (
       <div className={`flex gap-4 ${tight ? "items-stretch" : "items-start"}`}>
         <div className="flex-1 min-w-0">
@@ -99,7 +99,6 @@ const FieldDetailSection = ({
       );
     }
 
-    // PCは横2枚
     return (
       <div className={`flex gap-4 ${tight ? "items-stretch" : "items-start"}`}>
         <div className="flex-1 min-w-0">
@@ -112,7 +111,6 @@ const FieldDetailSection = ({
     );
   };
 
-  // wrapContent（モバイルの中スクロール用）はそのまま
   if (wrapContent) {
     return (
       <div className="space-y-3">
@@ -132,7 +130,6 @@ const FieldDetailSection = ({
     );
   }
 
-  // ✅ PC側：高さ固定（60vh）をやめる。必要な分だけ伸びて下を押し下げる
   return (
     <div className="space-y-3">
       <div className="min-h-[360px] min-w-0">
