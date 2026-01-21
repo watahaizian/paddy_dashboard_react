@@ -83,7 +83,7 @@ const ChartsAndStatusPanel = ({
         <DataDetailModal data={data} onClose={() => setShowDetail(false)} />
       )
       }
-      {showPhoto && imageUrl && (
+      {showPhoto && (
         <PhotoModal
           imageUrl={imageUrl}
           onClose={() => setShowPhoto(false)}

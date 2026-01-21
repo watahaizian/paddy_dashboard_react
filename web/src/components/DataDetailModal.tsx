@@ -18,7 +18,7 @@ const DataDetailModal = ({ data, onClose }: Props) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
         className="bg-white rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -30,7 +30,7 @@ const DataDetailModal = ({ data, onClose }: Props) => {
           </button>
         </div>
 
-        <div className="overflow-auto p-4 flex-1">
+        <div className="overflow-auto flex-1">
           <table className="w-full text-sm text-left text-slate-600">
             <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
               <tr>
