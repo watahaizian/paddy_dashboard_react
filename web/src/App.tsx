@@ -5,6 +5,7 @@ import { fetchFieldData, fetchFields } from "./api";
 import MapSection from "./components/MapSection";
 import FieldDetailSection from "./components/FieldDetailSection";
 import BottomSummarySection from "./components/BottomSummarySection.tsx";
+import WorkerDataSection from "./components/WorkerDataSection";
 
 const isAbortError = (e: unknown) => {
   return e instanceof DOMException && e.name === "AbortError";
@@ -174,16 +175,19 @@ const App = () => {
             </div>
           </div>
 
-          <div className="flex-[5] min-w-0 min-h-0 overflow-auto">
-            <FieldDetailSection
-              isCompact={false}
-              field={selectedField}
-              data={data}
-              loading={loadingData}
-              error={dataError}
-              onRefresh={refresh}
-              wrapContent={false}
-            />
+          <div className="flex-[5] min-w-0 min-h-0 flex flex-col gap-6">
+            <div className="flex-[7] min-h-0 overflow-auto">
+              <FieldDetailSection
+                isCompact={false}
+                field={selectedField}
+                data={data}
+                loading={loadingData}
+                error={dataError}
+                onRefresh={refresh}
+                wrapContent={false}
+              />
+            </div>
+            <WorkerDataSection />
           </div>
         </div>
       </main>

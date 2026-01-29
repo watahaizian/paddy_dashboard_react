@@ -10,16 +10,37 @@ type Props = {
   onSelect: (f: Field) => void;
 };
 
-const pin = (color: string, size: number) => {
+const pin = (color: string, size: number, alert: "none" | "!" | "!!!" = "none") => {
+  const alertHtml =
+    alert === "none"
+      ? ""
+      : `<div style="
+        position:absolute;
+        top:-20px;
+        left:50%;
+        transform:translateX(-50%);
+        background:#F6C84C;
+        color:#1A1A1A;
+        font-weight:800;
+        font-size:12px;
+        line-height:1;
+        padding:2px 6px 3px;
+        border-radius:999px;
+        border:2px solid white;
+        box-shadow:0 2px 6px rgba(0,0,0,.25);
+        white-space:nowrap;
+      ">${alert}</div>`;
+
   return L.divIcon({
     className: "",
     html: `<div style="
+      position:relative;
       width:${size}px;height:${size}px;
       border-radius:999px;
       background:${color};
       border:3px solid white;
       box-shadow:0 2px 8px rgba(0,0,0,.25);
-    "></div>`,
+    ">${alertHtml}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size],
   });
@@ -72,7 +93,8 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
 
           {fields.map((f) => {
             const isSelected = f.id === selectedId;
-            const icon = isSelected ? pin("#E53935", 22) : pin("#1F88E5", 18);
+            const alert = f.pinAlert ?? "none";
+            const icon = isSelected ? pin("#E53935", 22, alert) : pin("#1F88E5", 18, alert);
             return (
               <Marker
                 key={f.id}

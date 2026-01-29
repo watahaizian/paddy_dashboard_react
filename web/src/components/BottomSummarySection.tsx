@@ -4,6 +4,7 @@ import { useState } from "react";
 type Props = { isCompact: boolean };
 
 const cards = [
+  { title: "要対応圃場：1件", items: ["圃場E"] },
   { title: "作業待ち圃場：3件", items: ["圃場A", "圃場B", "圃場C"] },
   { title: "割当待ち圃場：1件", items: ["圃場D"] },
   { title: "稼働中メンバ：2人", items: ["水谷", "阪木"] },
@@ -17,7 +18,7 @@ const BottomSummarySection = ({ isCompact }: Props) => {
 
   if (isCompact) {
     return (
-      <div className="h-full flex flex-wrap gap-4">
+      <div className="h-full grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {cards.map((c) => (
           <SummaryCard
             key={c.title}
@@ -38,7 +39,7 @@ const BottomSummarySection = ({ isCompact }: Props) => {
   }
 
   return (
-    <div className="h-full grid grid-cols-3 gap-4">
+    <div className="h-full grid grid-cols-4 gap-4">
       {cards.map((c) => (
         <SummaryCard
           key={c.title}
@@ -72,7 +73,7 @@ const SummaryCard = ({
     <button
       type="button"
       onClick={onClick}
-      className="h-full bg-white border rounded-2xl p-4 flex flex-col min-w-[220px] text-left hover:shadow-md transition-shadow"
+      className="h-full bg-white border rounded-2xl p-4 flex flex-col w-full text-left hover:shadow-md transition-shadow"
     >
       <div className="font-bold">{title}</div>
       <div className="mt-3 flex-1 border rounded-xl bg-slate-50 p-3 flex flex-col justify-center gap-2">

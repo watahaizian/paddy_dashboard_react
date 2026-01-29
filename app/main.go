@@ -23,6 +23,7 @@ type Field struct {
 	Lat       float64 `json:"lat"`
 	Lon       float64 `json:"lon"`
 	OwnerName string  `json:"ownerName,omitempty"`
+	PinAlert  string  `json:"pinAlert,omitempty"`
 }
 
 type Point struct {
@@ -256,10 +257,15 @@ func ensureAtLeast3(fields []Field) []Field {
 		{-0.0012, 0.0020},
 		{0.0008, -0.0018},
 	}
+	alerts := []string{"!", "!!!", "none"}
 	i := 1
 	for _, off := range offsets {
 		if len(fields) >= 3 {
 			break
+		}
+		alert := "none"
+		if i-1 < len(alerts) {
+			alert = alerts[i-1]
 		}
 		fields = append(fields, Field{
 			ID:        fmt.Sprintf("dummy-%d", i),
@@ -267,6 +273,7 @@ func ensureAtLeast3(fields []Field) []Field {
 			Lat:       baseLat + off[0],
 			Lon:       baseLon + off[1],
 			OwnerName: "ダミー所有者",
+			PinAlert:  alert,
 		})
 		i++
 	}
