@@ -1,8 +1,67 @@
 // src/components/MapSection.tsx
-import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { MapContainer, TileLayer, Marker, Tooltip, Polygon, useMapEvents } from "react-leaflet";
 import { FaSun, FaThermometerHalf, FaTint } from "react-icons/fa";
 import L from "leaflet";
 import type { Field } from "../types";
+import polygonData from "../assets/2025_202142_chino.json";
+
+type GeoJsonFeature = {
+  type: "Feature";
+  geometry: {
+    type: "Polygon";
+    coordinates: number[][][];
+  };
+  properties?: {
+    polygon_uuid?: string;
+    land_type?: number;
+  };
+};
+
+type GeoJsonFeatureCollection = {
+  type: "FeatureCollection";
+  features: GeoJsonFeature[];
+};
+
+type IndexedPolygon = {
+  id: string;
+  bounds: L.LatLngBounds;
+  latlngs: [number, number][][];
+};
+
+const buildPolygonIndex = (data: GeoJsonFeatureCollection): IndexedPolygon[] => {
+  if (!data?.features) return [];
+
+  return data.features.flatMap((feature, index) => {
+    if (feature.properties?.land_type !== 100) return [];
+    if (!feature?.geometry || feature.geometry.type !== "Polygon") return [];
+    const coords = feature.geometry.coordinates ?? [];
+    if (coords.length === 0) return [];
+
+    let minLat = Infinity;
+    let minLng = Infinity;
+    let maxLat = -Infinity;
+    let maxLng = -Infinity;
+
+    const latlngs = coords.map((ring) =>
+      ring.map(([lng, lat]) => {
+        if (lat < minLat) minLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lat > maxLat) maxLat = lat;
+        if (lng > maxLng) maxLng = lng;
+        return [lat, lng] as [number, number];
+      })
+    );
+
+    if (!Number.isFinite(minLat) || !Number.isFinite(minLng)) return [];
+
+    const bounds = L.latLngBounds([minLat, minLng], [maxLat, maxLng]);
+    const id = feature.properties?.polygon_uuid ?? `polygon-${index}`;
+    return [{ id, bounds, latlngs }];
+  });
+};
+
+const polygonIndex = buildPolygonIndex(polygonData as GeoJsonFeatureCollection);
 
 type Props = {
   fields: Field[];
@@ -19,8 +78,8 @@ const pin = (color: string, size: number, alert: "none" | "!" | "!!!" = "none") 
         top:-20px;
         left:50%;
         transform:translateX(-50%);
-        background:#F6C84C;
-        color:#1A1A1A;
+        background:${alert == "!" ? "#F6C84C" : "#CF352E"};
+        color:${alert == "!" ? "#1A1A1A" : "#FFFFFF"};
         font-weight:800;
         font-size:12px;
         line-height:1;
@@ -46,6 +105,19 @@ const pin = (color: string, size: number, alert: "none" | "!" | "!!!" = "none") 
   });
 };
 
+const MapBoundsWatcher = ({ onChange }: { onChange: (bounds: L.LatLngBounds) => void }) => {
+  const map = useMapEvents({
+    moveend: () => onChange(map.getBounds()),
+    zoomend: () => onChange(map.getBounds()),
+  });
+
+  useEffect(() => {
+    onChange(map.getBounds());
+  }, [map, onChange]);
+
+  return null;
+};
+
 const MapSection = ({ fields, selectedId, onSelect }: Props) => {
   if (fields.length === 0) {
     return (
@@ -57,6 +129,16 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
 
   const center = fields[0];
   const selected = fields.find((f) => f.id === selectedId) ?? center;
+
+  const [mapBounds, setMapBounds] = useState<L.LatLngBounds | null>(null);
+  const handleBoundsChange = useCallback((bounds: L.LatLngBounds) => {
+    setMapBounds(bounds);
+  }, []);
+
+  const visiblePolygons = useMemo(() => {
+    if (!mapBounds) return [];
+    return polygonIndex.filter((poly) => mapBounds.intersects(poly.bounds));
+  }, [mapBounds]);
 
   return (
     <div style={{ border: "1px solid #BFCBDA", borderRadius: 16, overflow: "hidden", background: "white", height: "100%" }}>
@@ -90,6 +172,21 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
             url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; OpenStreetMap contributors'
           />
+
+          <MapBoundsWatcher onChange={handleBoundsChange} />
+
+          {visiblePolygons.map((poly) => (
+            <Polygon
+              key={poly.id}
+              positions={poly.latlngs}
+              pathOptions={{
+                color: "#2E7D32",
+                weight: 1,
+                fillColor: "#A5D6A7",
+                fillOpacity: 0.45,
+              }}
+            />
+          ))}
 
           {fields.map((f) => {
             const isSelected = f.id === selectedId;
