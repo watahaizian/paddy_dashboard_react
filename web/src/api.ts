@@ -1,5 +1,5 @@
 // src/api.ts
-import type { Field, FieldDataResponse } from "./types";
+import type { Field, FieldDataResponse, Worker } from "./types";
 import { makeDemoFieldData } from "./demo";
 
 const isAbortError = (e: unknown): boolean => {
@@ -32,4 +32,10 @@ export const fetchFieldData = async (padId: string, signal?: AbortSignal): Promi
         }
         return makeDemoFieldData(padId, 24);
     }
+};
+
+export const fetchWorkers = async (signal?: AbortSignal): Promise<Worker[]> => {
+    const res = await fetch("/api/workers", { signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as Worker[];
 };

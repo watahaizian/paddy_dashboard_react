@@ -26,6 +26,14 @@ type Field struct {
 	PinAlert  string  `json:"pinAlert,omitempty"`
 }
 
+type Worker struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Area     string `json:"area"`
+	Method   string `json:"method"`
+	PhotoURL string `json:"photoUrl"`
+}
+
 type Point struct {
 	T        int64    `json:"t"` // epoch millis
 	WaterCm  *float64 `json:"waterCm,omitempty"`
@@ -65,6 +73,34 @@ func main() {
 	})
 
 	// 圃場一覧
+	// 作業員データ（ダミー）
+	r.GET("/api/workers", func(c *gin.Context) {
+		workers := []Worker{
+			{
+				ID:       "worker-1",
+				Name:     "佐藤 直樹",
+				Area:     "茅野",
+				Method:   "自転車",
+				PhotoURL: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=facearea&w=96&h=96&q=80",
+			},
+			{
+				ID:       "worker-2",
+				Name:     "鈴木 真由",
+				Area:     "諏訪",
+				Method:   "車",
+				PhotoURL: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=facearea&w=96&h=96&q=80",
+			},
+			{
+				ID:       "worker-3",
+				Name:     "高橋 健",
+				Area:     "日本",
+				Method:   "徒歩",
+				PhotoURL: "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=facearea&w=96&h=96&q=80",
+			},
+		}
+		c.JSON(http.StatusOK, workers)
+	})
+
 	r.GET("/api/fields", func(c *gin.Context) {
 		base := upstreamBaseURL()
 		endpoint := base + "/app/paddy/get_devices"

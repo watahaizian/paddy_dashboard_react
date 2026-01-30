@@ -19,3 +19,11 @@ export type FieldDataResponse = {
     points: Point[];
     last?: Point;
 };
+
+export type Worker = {
+    id: string;
+    name: string;
+    area: string;
+    method: string;
+    photoUrl: string;
+};
