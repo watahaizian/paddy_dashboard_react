@@ -1,75 +1,26 @@
-# gin-nginx 🐹🔧
+﻿# paddy_dashboard_react
 
-### Docker で起動
+Frontend-only repository.
 
-プロジェクトルートで:
+## Structure
 
-```sh
+- `src/`, `public/`: React + Vite app
+- `compose.yaml`: Docker setup for frontend development
+
+## Start
+
+```bash
 docker compose up --build
 ```
 
-バックグラウンド起動:
+- Front URL: `http://localhost:5173`
+- API: `/api` is proxied to backend `http://localhost:8080`
 
-```sh
-docker compose up -d --build
-```
+## Backend
 
-api コンテナだけを再起動する:
+Run backend from `../paddy_db`:
 
-```sh
-docker compose restart api
-```
-
-アクセス: `http://localhost:8080`
-
-### ローカルで実行（開発向け）
-
-`app/` フォルダで実行:
-
-```sh
-cd app
-go run main.go
-```
-
-サーバはデフォルトで `:8080` をリッスンします。
-
----
-
-## API エンドポイント 📡
-
-- GET `/` → `static/index.html` を返す
-- GET `/api/ping` → 動作確認（レスポンス: `{ "message": "pong" }`）
-- POST `/api/echo` → JSON またはフォームで `text` を受け取り、受け取った値を返す
-
-例: curl
-
-```sh
-curl -X GET http://localhost:8080/api/ping
-# => {"message":"pong"}
-
-curl -X POST -H "Content-Type: application/json" -d '{"text":"hello"}' http://localhost:8080/api/echo
-# => {"you_sent":"hello"}
-```
-
-PowerShell 例:
-
-```powershell
-Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/echo" -ContentType "application/json" -Body '{"text":"hello"}'
-```
-
----
-
-## プロジェクト構成 📁
-
-```
-compose.yaml
-app/
-  Dockerfile
-  Dockerfile.dev
-  go.mod
-  main.go
-  static/
-    index.html
-nginx/
-  default.conf
+```bash
+cd ../paddy_db
+docker compose up --build
 ```
