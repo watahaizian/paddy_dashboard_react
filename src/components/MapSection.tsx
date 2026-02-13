@@ -1,7 +1,9 @@
 // src/components/MapSection.tsx
-import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { MapContainer, TileLayer, Marker, Tooltip, Polygon, useMapEvents } from "react-leaflet";
 import { FaSun, FaThermometerHalf, FaTint } from "react-icons/fa";
 import L from "leaflet";
+import { fetchPolygonLocalGovernments, fetchPolygons, type LocalGovernment, type PolygonApiRow } from "../api";
 import type { Field } from "../types";
 
 type Props = {
@@ -9,6 +11,19 @@ type Props = {
   selectedId?: string;
   onSelect: (f: Field) => void;
 };
+
+type DisplayPolygon = {
+  polyId: number;
+  latlngs: [number, number][][];
+  bounds: L.LatLngBounds;
+};
+
+type ActiveScope = {
+  key: string;
+  localGovernmentCode?: string;
+};
+
+const minPolygonZoom = 15;
 
 const pin = (color: string, size: number, alert: "none" | "!" | "!!!" = "none") => {
   const alertHtml =
@@ -46,7 +61,315 @@ const pin = (color: string, size: number, alert: "none" | "!" | "!!!" = "none") 
   });
 };
 
+const isAbortError = (e: unknown): boolean => {
+  return e instanceof DOMException && e.name === "AbortError";
+};
+
+const toLatLngRings = (coordinates: unknown): [number, number][][] => {
+  if (!Array.isArray(coordinates)) {
+    return [];
+  }
+
+  const rings: [number, number][][] = [];
+  for (const ring of coordinates) {
+    if (!Array.isArray(ring)) {
+      continue;
+    }
+
+    const points: [number, number][] = [];
+    for (const point of ring) {
+      if (!Array.isArray(point) || point.length < 2) {
+        continue;
+      }
+
+      const lng = Number(point[0]);
+      const lat = Number(point[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        continue;
+      }
+
+      points.push([lat, lng]);
+    }
+
+    if (points.length >= 3) {
+      rings.push(points);
+    }
+  }
+
+  return rings;
+};
+
+const toDisplayPolygon = (row: PolygonApiRow): DisplayPolygon | null => {
+  const latlngs = toLatLngRings(row.coordinates);
+  if (latlngs.length === 0) {
+    return null;
+  }
+
+  const allPoints = latlngs.flat();
+  if (allPoints.length === 0) {
+    return null;
+  }
+
+  return {
+    polyId: row.poly_id,
+    latlngs,
+    bounds: L.latLngBounds(allPoints),
+  };
+};
+
+const MapBoundsWatcher = ({
+  onViewChanged,
+}: {
+  onViewChanged: (bounds: L.LatLngBounds, zoom: number) => void;
+}) => {
+  const map = useMapEvents({
+    moveend: () => onViewChanged(map.getBounds(), map.getZoom()),
+    zoomend: () => onViewChanged(map.getBounds(), map.getZoom()),
+  });
+
+  useEffect(() => {
+    onViewChanged(map.getBounds(), map.getZoom());
+  }, [map, onViewChanged]);
+
+  return null;
+};
+
 const MapSection = ({ fields, selectedId, onSelect }: Props) => {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [localGovernments, setLocalGovernments] = useState<LocalGovernment[]>([]);
+  const [localGovernmentError, setLocalGovernmentError] = useState<string | null>(null);
+  const [selectedPrefectureCode, setSelectedPrefectureCode] = useState("");
+  const [enabledMunicipalityCodes, setEnabledMunicipalityCodes] = useState<string[]>([]);
+  const [polygonCacheByScope, setPolygonCacheByScope] = useState<Record<string, DisplayPolygon[]>>({});
+  const [polygonError, setPolygonError] = useState<string | null>(null);
+  const [polygonLoadProgress, setPolygonLoadProgress] = useState<{ total: number; done: number }>({
+    total: 0,
+    done: 0,
+  });
+  const [view, setView] = useState<{ bounds: L.LatLngBounds; zoom: number } | null>(null);
+
+  const prefectureOptions = useMemo(() => {
+    const byCode = new Map<string, string>();
+    for (const row of localGovernments) {
+      if (!row.prefecture_code) {
+        continue;
+      }
+      if (!byCode.has(row.prefecture_code)) {
+        byCode.set(row.prefecture_code, row.prefecture_name || `Prefecture ${row.prefecture_code}`);
+      }
+    }
+    return Array.from(byCode.entries())
+      .map(([code, name]) => ({ code, name }))
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [localGovernments]);
+
+  const municipalityOptions = useMemo(() => {
+    if (!selectedPrefectureCode) {
+      return [] as LocalGovernment[];
+    }
+    return localGovernments
+      .filter((row) => row.prefecture_code === selectedPrefectureCode)
+      .sort((a, b) => a.local_government_code.localeCompare(b.local_government_code));
+  }, [localGovernments, selectedPrefectureCode]);
+
+  const activeScopes = useMemo<ActiveScope[]>(() => {
+    const scopes: ActiveScope[] = [];
+    for (const code of enabledMunicipalityCodes) {
+      scopes.push({ key: `local:${code}`, localGovernmentCode: code });
+    }
+    return scopes;
+  }, [enabledMunicipalityCodes]);
+
+  const handleViewChanged = useCallback((bounds: L.LatLngBounds, zoom: number) => {
+    setView({ bounds, zoom });
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const ac = new AbortController();
+
+    (async () => {
+      setLocalGovernmentError(null);
+      try {
+        const rows = await fetchPolygonLocalGovernments(ac.signal);
+        if (!alive) {
+          return;
+        }
+        setLocalGovernments(rows);
+      } catch (e) {
+        if (!alive || isAbortError(e)) {
+          return;
+        }
+        setLocalGovernmentError(String(e));
+      }
+    })();
+
+    return () => {
+      alive = false;
+      ac.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPrefectureCode && prefectureOptions.length > 0) {
+      setSelectedPrefectureCode(prefectureOptions[0].code);
+    }
+  }, [prefectureOptions, selectedPrefectureCode]);
+
+  useEffect(() => {
+    const activeKeys = new Set(activeScopes.map((scope) => scope.key));
+    setPolygonCacheByScope((prev) => {
+      const next: Record<string, DisplayPolygon[]> = {};
+      let changed = false;
+
+      for (const [key, polygons] of Object.entries(prev)) {
+        if (activeKeys.has(key)) {
+          next[key] = polygons;
+        } else {
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [activeScopes]);
+
+  useEffect(() => {
+    const missingScopes = activeScopes.filter((scope) => polygonCacheByScope[scope.key] == null);
+    if (missingScopes.length === 0) {
+      setPolygonLoadProgress({ total: 0, done: 0 });
+      return;
+    }
+
+    let alive = true;
+    const ac = new AbortController();
+    setPolygonLoadProgress({ total: missingScopes.length, done: 0 });
+
+    (async () => {
+      setPolygonError(null);
+      try {
+        const results = await Promise.all(
+          missingScopes.map(async (scope) => {
+            const rows = await fetchPolygons(
+              {
+                localGovernmentCode: scope.localGovernmentCode,
+              },
+              ac.signal
+            );
+            const polygons = rows
+              .map(toDisplayPolygon)
+              .filter((poly): poly is DisplayPolygon => poly !== null);
+            if (alive) {
+              setPolygonLoadProgress((prev) => ({
+                total: prev.total,
+                done: Math.min(prev.total, prev.done + 1),
+              }));
+            }
+            return [scope.key, polygons] as const;
+          })
+        );
+
+        if (!alive) {
+          return;
+        }
+
+        setPolygonCacheByScope((prev) => {
+          const next = { ...prev };
+          for (const [key, polygons] of results) {
+            next[key] = polygons;
+          }
+          return next;
+        });
+      } catch (e) {
+        if (!alive || isAbortError(e)) {
+          return;
+        }
+        setPolygonError(String(e));
+      } finally {
+        if (alive) {
+          setPolygonLoadProgress({ total: 0, done: 0 });
+        }
+      }
+    })();
+
+    return () => {
+      alive = false;
+      ac.abort();
+    };
+  }, [activeScopes, polygonCacheByScope]);
+
+  const activePolygons = useMemo(() => {
+    const byId = new Map<number, DisplayPolygon>();
+    for (const scope of activeScopes) {
+      const rows = polygonCacheByScope[scope.key] ?? [];
+      for (const poly of rows) {
+        if (!byId.has(poly.polyId)) {
+          byId.set(poly.polyId, poly);
+        }
+      }
+    }
+    return Array.from(byId.values());
+  }, [activeScopes, polygonCacheByScope]);
+
+  const visiblePolygons = useMemo(() => {
+    if (view == null || view.zoom < minPolygonZoom) {
+      return [] as DisplayPolygon[];
+    }
+    return activePolygons.filter((poly) => poly.bounds.intersects(view.bounds));
+  }, [activePolygons, view]);
+
+  const isPolygonLoading = polygonLoadProgress.total > 0 && polygonLoadProgress.done < polygonLoadProgress.total;
+  const polygonLoadPercent =
+    polygonLoadProgress.total > 0
+      ? Math.min(100, Math.round((polygonLoadProgress.done / polygonLoadProgress.total) * 100))
+      : 0;
+
+  const selectedPrefectureMunicipalityCodes = municipalityOptions.map(
+    (m) => m.local_government_code
+  );
+  const currentPrefectureEnabled =
+    selectedPrefectureMunicipalityCodes.length > 0 &&
+    selectedPrefectureMunicipalityCodes.every((code) =>
+      enabledMunicipalityCodes.includes(code)
+    );
+
+  const toggleSelectedPrefecture = () => {
+    if (!selectedPrefectureCode) {
+      return;
+    }
+
+    setEnabledMunicipalityCodes((prev) => {
+      if (selectedPrefectureMunicipalityCodes.length === 0) {
+        return prev;
+      }
+
+      if (currentPrefectureEnabled) {
+        return prev.filter(
+          (code) => !selectedPrefectureMunicipalityCodes.includes(code)
+        );
+      }
+
+      const next = new Set(prev);
+      for (const code of selectedPrefectureMunicipalityCodes) {
+        next.add(code);
+      }
+      return Array.from(next);
+    });
+  };
+
+  const toggleMunicipality = (localGovernmentCode: string) => {
+    setEnabledMunicipalityCodes((prev) => {
+      if (prev.includes(localGovernmentCode)) {
+        return prev.filter((code) => code !== localGovernmentCode);
+      }
+      return [...prev, localGovernmentCode];
+    });
+  };
+
+  const clearAllPolygonVisibility = () => {
+    setEnabledMunicipalityCodes([]);
+  };
+
   if (fields.length === 0) {
     return (
       <div style={{ border: "1px solid #BFCBDA", borderRadius: 16, background: "white", height: "100%", display: "grid", placeItems: "center" }}>
@@ -64,21 +387,189 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
         <div>エリア名</div>
 
         <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <FaSun style={{ color: '#F6C84C' }} size={18} />
+          <FaSun style={{ color: "#F6C84C" }} size={18} />
           <span>天気</span>
         </div>
 
         <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <FaThermometerHalf style={{ color: '#E53935' }} size={16} />
+          <FaThermometerHalf style={{ color: "#E53935" }} size={16} />
           <span>気温</span>
         </div>
 
         <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <FaTint style={{ color: '#1F88E5' }} size={16} />
+          <FaTint style={{ color: "#1F88E5" }} size={16} />
           <span>12時間予測降水量</span>
         </div>
       </div>
-      <div style={{ borderTop: "1px solid #BFCBDA", height: "calc(100% - 44px)" }}>
+      <div style={{ borderTop: "1px solid #BFCBDA", height: "calc(100% - 44px)", position: "relative" }}>
+        <div
+          style={{
+            position: "absolute",
+            zIndex: 500,
+            top: 8,
+            right: 8,
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((prev) => !prev)}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: "1px solid #9FB4C8",
+              background: "white",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            ポリゴン表示設定
+          </button>
+        </div>
+
+        {settingsOpen && (
+          <div
+            style={{
+              position: "absolute",
+              zIndex: 500,
+              top: 44,
+              right: 8,
+              width: 320,
+              maxHeight: 420,
+              overflow: "auto",
+              border: "1px solid #9FB4C8",
+              borderRadius: 12,
+              background: "white",
+              boxShadow: "0 6px 18px rgba(0,0,0,.14)",
+              padding: 12,
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>表示ON/OFF</div>
+            <div style={{ fontSize: 12, color: "#4A657F", marginBottom: 10 }}>
+              ポリゴンはズーム {minPolygonZoom} 以上で表示します
+            </div>
+
+            {localGovernmentError && (
+              <div style={{ fontSize: 12, color: "#C62828", marginBottom: 10 }}>
+                自治体一覧取得エラー: {localGovernmentError}
+              </div>
+            )}
+
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ display: "block", fontSize: 12, color: "#4A657F", marginBottom: 4 }}>都道府県</label>
+              <select
+                value={selectedPrefectureCode}
+                onChange={(e) => setSelectedPrefectureCode(e.target.value)}
+                style={{ width: "100%", border: "1px solid #BFCBDA", borderRadius: 8, padding: "6px 8px" }}
+              >
+                {prefectureOptions.map((pref) => (
+                  <option key={pref.code} value={pref.code}>
+                    {pref.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <button
+                type="button"
+                onClick={toggleSelectedPrefecture}
+                disabled={!selectedPrefectureCode}
+                style={{
+                  flex: 1,
+                  border: "1px solid #9FB4C8",
+                  borderRadius: 8,
+                  padding: "6px 8px",
+                  background: currentPrefectureEnabled ? "#2E7D32" : "white",
+                  color: currentPrefectureEnabled ? "white" : "#1F2D3A",
+                  fontWeight: 700,
+                  cursor: selectedPrefectureCode ? "pointer" : "not-allowed",
+                }}
+              >
+                全て{currentPrefectureEnabled ? "OFF" : "ON"}
+              </button>
+              <button
+                type="button"
+                onClick={clearAllPolygonVisibility}
+                style={{
+                  border: "1px solid #9FB4C8",
+                  borderRadius: 8,
+                  padding: "6px 8px",
+                  background: "white",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                全解除
+              </button>
+            </div>
+
+            {isPolygonLoading && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 12, color: "#4A657F", marginBottom: 4 }}>
+                  読み込み中 {polygonLoadProgress.done}/{polygonLoadProgress.total} ({polygonLoadPercent}%)
+                </div>
+                <div
+                  style={{
+                    width: "100%",
+                    height: 8,
+                    borderRadius: 999,
+                    background: "#E1E7EF",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${polygonLoadPercent}%`,
+                      height: "100%",
+                      background: "#2E7D32",
+                      transition: "width 160ms linear",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontSize: 12, color: "#4A657F", marginBottom: 6 }}>市町村</div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {municipalityOptions.map((m) => {
+                const checked = enabledMunicipalityCodes.includes(m.local_government_code);
+                return (
+                  <label
+                    key={m.local_government_code}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      border: "1px solid #E1E7EF",
+                      borderRadius: 8,
+                      padding: "6px 8px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleMunicipality(m.local_government_code)}
+                    />
+                    <span style={{ fontSize: 13 }}>{m.municipality_name || m.local_government_name}</span>
+                  </label>
+                );
+              })}
+              {municipalityOptions.length === 0 && (
+                <div style={{ fontSize: 12, color: "#607D99" }}>市町村データがありません</div>
+              )}
+            </div>
+
+            {polygonError && (
+              <div style={{ marginTop: 10, fontSize: 12, color: "#C62828" }}>
+                ポリゴン取得エラー: {polygonError}
+              </div>
+            )}
+          </div>
+        )}
+
         <MapContainer
           key={selected.id}
           center={[selected.lat, selected.lon]}
@@ -88,8 +579,23 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
         >
           <TileLayer
             url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; OpenStreetMap contributors'
+            attribution="&copy; OpenStreetMap contributors"
           />
+
+          <MapBoundsWatcher onViewChanged={handleViewChanged} />
+
+          {visiblePolygons.map((poly) => (
+            <Polygon
+              key={poly.polyId}
+              positions={poly.latlngs}
+              pathOptions={{
+                color: "#2E7D32",
+                weight: 1,
+                fillColor: "#A5D6A7",
+                fillOpacity: 0.45,
+              }}
+            />
+          ))}
 
           {fields.map((f) => {
             const isSelected = f.id === selectedId;

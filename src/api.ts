@@ -85,3 +85,47 @@ export const fetchWorkers = async (signal?: AbortSignal): Promise<Worker[]> => {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return (await res.json()) as Worker[];
 };
+
+export type LocalGovernment = {
+    local_government_code: string;
+    local_government_name: string;
+    prefecture_code: string;
+    prefecture_name: string;
+    municipality_name: string;
+};
+
+export type PolygonApiRow = {
+    poly_id: number;
+    local_government_code?: string;
+    coordinates: unknown;
+};
+
+type FetchPolygonsParams = {
+    prefectureCode?: string;
+    localGovernmentCode?: string;
+};
+
+export const fetchPolygonLocalGovernments = async (signal?: AbortSignal): Promise<LocalGovernment[]> => {
+    const res = await fetch("/api/polygons/local-governments", { signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as LocalGovernment[];
+};
+
+export const fetchPolygons = async (
+    params: FetchPolygonsParams,
+    signal?: AbortSignal
+): Promise<PolygonApiRow[]> => {
+    const qs = new URLSearchParams();
+    if (params.prefectureCode?.trim()) {
+        qs.set("prefecture_code", params.prefectureCode.trim());
+    }
+    if (params.localGovernmentCode?.trim()) {
+        qs.set("local_government_code", params.localGovernmentCode.trim());
+    }
+
+    const suffix = qs.toString();
+    const url = suffix ? `/api/polygons?${suffix}` : "/api/polygons";
+    const res = await fetch(url, { signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as PolygonApiRow[];
+};
