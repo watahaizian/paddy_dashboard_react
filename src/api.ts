@@ -98,6 +98,7 @@ export type PolygonApiRow = {
     poly_id: number;
     local_government_code?: string;
     coordinates: unknown;
+    in_use?: boolean;
 };
 
 type FetchPolygonsParams = {

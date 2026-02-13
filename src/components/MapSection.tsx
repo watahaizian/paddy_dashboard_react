@@ -16,6 +16,7 @@ type DisplayPolygon = {
   polyId: number;
   latlngs: [number, number][][];
   bounds: L.LatLngBounds;
+  inUse: boolean;
 };
 
 type ActiveScope = {
@@ -114,6 +115,7 @@ const toDisplayPolygon = (row: PolygonApiRow): DisplayPolygon | null => {
     polyId: row.poly_id,
     latlngs,
     bounds: L.latLngBounds(allPoints),
+    inUse: row.in_use === true,
   };
 };
 
@@ -589,9 +591,9 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
               key={poly.polyId}
               positions={poly.latlngs}
               pathOptions={{
-                color: "#2E7D32",
+                color: poly.inUse ? "#B71C1C" : "#2E7D32",
                 weight: 1,
-                fillColor: "#A5D6A7",
+                fillColor: poly.inUse ? "#EF9A9A" : "#A5D6A7",
                 fillOpacity: 0.45,
               }}
             />
