@@ -1,6 +1,10 @@
 // src/api.ts
 import type { Field, FieldDataResponse, Worker } from "./types";
 
+const isAbortError = (e: unknown): boolean => {
+    return e instanceof DOMException && e.name === "AbortError";
+};
+
 export const fetchFields = async (signal?: AbortSignal): Promise<Field[]> => {
     const res = await fetch("/api/fields", { signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -14,6 +18,9 @@ export const fetchFields = async (signal?: AbortSignal): Promise<Field[]> => {
         waterlevel?: number | string | null;
         temperature?: number | string | null;
     };
+    type ApiRequest = {
+        target_field_id?: number | string | null;
+    };
 
     const toNumberOrUndef = (v: unknown): number | undefined => {
         if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -25,6 +32,26 @@ export const fetchFields = async (signal?: AbortSignal): Promise<Field[]> => {
     };
 
     const rows = (await res.json()) as ApiField[];
+    const activeRequestFieldIDs = new Set<string>();
+
+    try {
+        // API呼び出し回数を減らすため、依頼一覧はまず全件取得を試す。
+        const requestRes = await fetch("/api/requests", { signal });
+        if (requestRes.ok) {
+            const requestRows = (await requestRes.json()) as ApiRequest[];
+            for (const request of requestRows) {
+                const fieldID = request.target_field_id == null ? "" : String(request.target_field_id).trim();
+                if (fieldID !== "") {
+                    activeRequestFieldIDs.add(fieldID);
+                }
+            }
+        }
+    } catch (e) {
+        if (isAbortError(e)) {
+            throw e;
+        }
+    }
+
     return rows
         .map((row) => {
             const id = row.field_id == null ? "" : String(row.field_id);
@@ -38,6 +65,9 @@ export const fetchFields = async (signal?: AbortSignal): Promise<Field[]> => {
             if (waterCm == null || temp == null) {
                 pinAlert = "!!!";
             } else if (waterCm < 2 || waterCm > 25 || temp < 5 || temp > 35) {
+                pinAlert = "!";
+            }
+            if (activeRequestFieldIDs.has(id)) {
                 pinAlert = "!";
             }
 
