@@ -195,7 +195,39 @@ export const fetchFieldData = async (padId: string, signal?: AbortSignal): Promi
 export const fetchWorkers = async (signal?: AbortSignal): Promise<Worker[]> => {
     const res = await fetch("/api/workers", { signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()) as Worker[];
+
+    type ApiWorker = {
+        id?: string;
+        name?: string;
+        area?: string;
+        method?: string;
+        photoUrl?: string;
+        online_status?: number | string;
+        is_online?: boolean;
+        contact_email?: string;
+        contact_phone?: string;
+    };
+
+    const rows = (await res.json()) as ApiWorker[];
+    return rows.map((row) => {
+        const onlineStatusRaw = Number(row.online_status ?? 2);
+        const onlineStatus: 1 | 2 = onlineStatusRaw === 1 ? 1 : 2;
+        const isOnline = typeof row.is_online === "boolean"
+            ? row.is_online
+            : onlineStatus === 1;
+
+        return {
+            id: String(row.id ?? "").trim(),
+            name: String(row.name ?? "").trim() || "未設定",
+            area: String(row.area ?? "").trim() || "未設定",
+            method: String(row.method ?? "").trim() || "未設定",
+            photoUrl: String(row.photoUrl ?? "").trim(),
+            onlineStatus,
+            isOnline,
+            contactEmail: String(row.contact_email ?? "").trim(),
+            contactPhone: String(row.contact_phone ?? "").trim(),
+        } satisfies Worker;
+    }).filter((row) => row.id !== "");
 };
 
 export type LocalGovernment = {

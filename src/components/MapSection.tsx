@@ -1,5 +1,6 @@
 // src/components/MapSection.tsx
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Tooltip, Polygon, useMapEvents } from "react-leaflet";
 import { FaSun, FaThermometerHalf, FaTint } from "react-icons/fa";
 import L from "leaflet";
@@ -25,6 +26,14 @@ type ActiveScope = {
 };
 
 const minPolygonZoom = 15;
+const EMPTY_LOCAL_GOVERNMENTS: LocalGovernment[] = [];
+
+const toErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+};
 
 const pin = (color: string, size: number, alert: "none" | "!" | "!!!" = "none") => {
   const alertHtml =
@@ -60,10 +69,6 @@ const pin = (color: string, size: number, alert: "none" | "!" | "!!!" = "none") 
     iconSize: [size, size],
     iconAnchor: [size / 2, size],
   });
-};
-
-const isAbortError = (e: unknown): boolean => {
-  return e instanceof DOMException && e.name === "AbortError";
 };
 
 const toLatLngRings = (coordinates: unknown): [number, number][][] => {
@@ -138,17 +143,22 @@ const MapBoundsWatcher = ({
 
 const MapSection = ({ fields, selectedId, onSelect }: Props) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [localGovernments, setLocalGovernments] = useState<LocalGovernment[]>([]);
-  const [localGovernmentError, setLocalGovernmentError] = useState<string | null>(null);
   const [selectedPrefectureCode, setSelectedPrefectureCode] = useState("");
   const [enabledMunicipalityCodes, setEnabledMunicipalityCodes] = useState<string[]>([]);
-  const [polygonCacheByScope, setPolygonCacheByScope] = useState<Record<string, DisplayPolygon[]>>({});
-  const [polygonError, setPolygonError] = useState<string | null>(null);
-  const [polygonLoadProgress, setPolygonLoadProgress] = useState<{ total: number; done: number }>({
-    total: 0,
-    done: 0,
-  });
   const [view, setView] = useState<{ bounds: L.LatLngBounds; zoom: number } | null>(null);
+
+  const localGovernmentsQuery = useQuery({
+    queryKey: ["polygonLocalGovernments"],
+    queryFn: ({ signal }) => fetchPolygonLocalGovernments(signal),
+    staleTime: 5 * 60 * 1000,
+  });
+  const localGovernments = useMemo(
+    () => localGovernmentsQuery.data ?? EMPTY_LOCAL_GOVERNMENTS,
+    [localGovernmentsQuery.data]
+  );
+  const localGovernmentError = localGovernmentsQuery.error
+    ? toErrorMessage(localGovernmentsQuery.error)
+    : null;
 
   const prefectureOptions = useMemo(() => {
     const byCode = new Map<string, string>();
@@ -165,14 +175,21 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
       .sort((a, b) => a.code.localeCompare(b.code));
   }, [localGovernments]);
 
+  const effectiveSelectedPrefectureCode = useMemo(() => {
+    if (selectedPrefectureCode && prefectureOptions.some((pref) => pref.code === selectedPrefectureCode)) {
+      return selectedPrefectureCode;
+    }
+    return prefectureOptions[0]?.code ?? "";
+  }, [prefectureOptions, selectedPrefectureCode]);
+
   const municipalityOptions = useMemo(() => {
-    if (!selectedPrefectureCode) {
+    if (!effectiveSelectedPrefectureCode) {
       return [] as LocalGovernment[];
     }
     return localGovernments
-      .filter((row) => row.prefecture_code === selectedPrefectureCode)
+      .filter((row) => row.prefecture_code === effectiveSelectedPrefectureCode)
       .sort((a, b) => a.local_government_code.localeCompare(b.local_government_code));
-  }, [localGovernments, selectedPrefectureCode]);
+  }, [effectiveSelectedPrefectureCode, localGovernments]);
 
   const activeScopes = useMemo<ActiveScope[]>(() => {
     const scopes: ActiveScope[] = [];
@@ -182,136 +199,49 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
     return scopes;
   }, [enabledMunicipalityCodes]);
 
+  const polygonQueries = useQueries({
+    queries: activeScopes.map((scope) => ({
+      queryKey: ["polygons", scope.localGovernmentCode ?? ""],
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchPolygons(
+          {
+            localGovernmentCode: scope.localGovernmentCode,
+          },
+          signal
+        ),
+      staleTime: 5 * 60 * 1000,
+      enabled: !!scope.localGovernmentCode,
+    })),
+  });
+
   const handleViewChanged = useCallback((bounds: L.LatLngBounds, zoom: number) => {
     setView({ bounds, zoom });
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    const ac = new AbortController();
-
-    (async () => {
-      setLocalGovernmentError(null);
-      try {
-        const rows = await fetchPolygonLocalGovernments(ac.signal);
-        if (!alive) {
-          return;
-        }
-        setLocalGovernments(rows);
-      } catch (e) {
-        if (!alive || isAbortError(e)) {
-          return;
-        }
-        setLocalGovernmentError(String(e));
-      }
-    })();
-
-    return () => {
-      alive = false;
-      ac.abort();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!selectedPrefectureCode && prefectureOptions.length > 0) {
-      setSelectedPrefectureCode(prefectureOptions[0].code);
-    }
-  }, [prefectureOptions, selectedPrefectureCode]);
-
-  useEffect(() => {
-    const activeKeys = new Set(activeScopes.map((scope) => scope.key));
-    setPolygonCacheByScope((prev) => {
-      const next: Record<string, DisplayPolygon[]> = {};
-      let changed = false;
-
-      for (const [key, polygons] of Object.entries(prev)) {
-        if (activeKeys.has(key)) {
-          next[key] = polygons;
-        } else {
-          changed = true;
-        }
-      }
-
-      return changed ? next : prev;
-    });
-  }, [activeScopes]);
-
-  useEffect(() => {
-    const missingScopes = activeScopes.filter((scope) => polygonCacheByScope[scope.key] == null);
-    if (missingScopes.length === 0) {
-      setPolygonLoadProgress({ total: 0, done: 0 });
-      return;
-    }
-
-    let alive = true;
-    const ac = new AbortController();
-    setPolygonLoadProgress({ total: missingScopes.length, done: 0 });
-
-    (async () => {
-      setPolygonError(null);
-      try {
-        const results = await Promise.all(
-          missingScopes.map(async (scope) => {
-            const rows = await fetchPolygons(
-              {
-                localGovernmentCode: scope.localGovernmentCode,
-              },
-              ac.signal
-            );
-            const polygons = rows
-              .map(toDisplayPolygon)
-              .filter((poly): poly is DisplayPolygon => poly !== null);
-            if (alive) {
-              setPolygonLoadProgress((prev) => ({
-                total: prev.total,
-                done: Math.min(prev.total, prev.done + 1),
-              }));
-            }
-            return [scope.key, polygons] as const;
-          })
-        );
-
-        if (!alive) {
-          return;
-        }
-
-        setPolygonCacheByScope((prev) => {
-          const next = { ...prev };
-          for (const [key, polygons] of results) {
-            next[key] = polygons;
-          }
-          return next;
-        });
-      } catch (e) {
-        if (!alive || isAbortError(e)) {
-          return;
-        }
-        setPolygonError(String(e));
-      } finally {
-        if (alive) {
-          setPolygonLoadProgress({ total: 0, done: 0 });
-        }
-      }
-    })();
-
-    return () => {
-      alive = false;
-      ac.abort();
-    };
-  }, [activeScopes, polygonCacheByScope]);
-
   const activePolygons = useMemo(() => {
     const byId = new Map<number, DisplayPolygon>();
-    for (const scope of activeScopes) {
-      const rows = polygonCacheByScope[scope.key] ?? [];
+    for (let i = 0; i < activeScopes.length; i += 1) {
+      const rows = polygonQueries[i]?.data ?? [];
       for (const poly of rows) {
-        if (!byId.has(poly.polyId)) {
-          byId.set(poly.polyId, poly);
+        const displayPolygon = toDisplayPolygon(poly);
+        if (displayPolygon != null && !byId.has(displayPolygon.polyId)) {
+          byId.set(displayPolygon.polyId, displayPolygon);
         }
       }
     }
     return Array.from(byId.values());
-  }, [activeScopes, polygonCacheByScope]);
+  }, [activeScopes, polygonQueries]);
+
+  const polygonLoadProgress = useMemo(() => {
+    const total = polygonQueries.length;
+    const done = polygonQueries.filter((query) => query.status === "success" || query.status === "error").length;
+    return { total, done };
+  }, [polygonQueries]);
+
+  const polygonError = useMemo(() => {
+    const firstError = polygonQueries.find((query) => query.error != null)?.error;
+    return firstError == null ? null : toErrorMessage(firstError);
+  }, [polygonQueries]);
 
   const visiblePolygons = useMemo(() => {
     if (view == null || view.zoom < minPolygonZoom) {
@@ -336,7 +266,7 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
     );
 
   const toggleSelectedPrefecture = () => {
-    if (!selectedPrefectureCode) {
+    if (!effectiveSelectedPrefectureCode) {
       return;
     }
 
@@ -462,7 +392,7 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: "block", fontSize: 12, color: "#4A657F", marginBottom: 4 }}>都道府県</label>
               <select
-                value={selectedPrefectureCode}
+                value={effectiveSelectedPrefectureCode}
                 onChange={(e) => setSelectedPrefectureCode(e.target.value)}
                 style={{ width: "100%", border: "1px solid #BFCBDA", borderRadius: 8, padding: "6px 8px" }}
               >
@@ -478,7 +408,7 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
               <button
                 type="button"
                 onClick={toggleSelectedPrefecture}
-                disabled={!selectedPrefectureCode}
+                disabled={!effectiveSelectedPrefectureCode}
                 style={{
                   flex: 1,
                   border: "1px solid #9FB4C8",
@@ -487,7 +417,7 @@ const MapSection = ({ fields, selectedId, onSelect }: Props) => {
                   background: currentPrefectureEnabled ? "#2E7D32" : "white",
                   color: currentPrefectureEnabled ? "white" : "#1F2D3A",
                   fontWeight: 700,
-                  cursor: selectedPrefectureCode ? "pointer" : "not-allowed",
+                  cursor: effectiveSelectedPrefectureCode ? "pointer" : "not-allowed",
                 }}
               >
                 全て{currentPrefectureEnabled ? "OFF" : "ON"}

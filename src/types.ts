@@ -26,4 +26,8 @@ export type Worker = {
     area: string;
     method: string;
     photoUrl: string;
+    onlineStatus: 1 | 2;
+    isOnline: boolean;
+    contactEmail: string;
+    contactPhone: string;
 };
