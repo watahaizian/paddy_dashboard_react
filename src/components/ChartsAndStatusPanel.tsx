@@ -1,6 +1,6 @@
 // src/components/ChartsAndStatusPanel.tsx
 import { useState } from "react";
-import type { FieldDataResponse } from "../types";
+import type { Field, FieldDataResponse } from "../types";
 import ChartCard from "./ChartCard.tsx";
 import SensorStatusCard from "./SensorStatusCard.tsx";
 import DashboardButton from "./DashboardButton.tsx";
@@ -10,6 +10,7 @@ import PhotoModal from "./PhotoModal.tsx";
 type Props = {
   padId: string;
   fieldName: string;
+  field: Field;
   imageUrl?: string;
   data: FieldDataResponse | null;
   loading: boolean;
@@ -19,6 +20,7 @@ type Props = {
 
 const ChartsAndStatusPanel = ({
   fieldName,
+  field,
   data,
   imageUrl,
   loading,
@@ -70,7 +72,7 @@ const ChartsAndStatusPanel = ({
 
             <div className="w-full min-[520px]:w-[220px] flex-none flex flex-col gap-2 z-10">
               <div className="flex-1 min-h-0">
-                <SensorStatusCard data={data} loading={loading} error={error} />
+                <SensorStatusCard field={field} data={data} loading={loading} error={error} />
               </div>
               <DashboardButton label="データ詳細" heightClass="h-11" onClick={() => setShowDetail(true)} />
               <DashboardButton label="写真" heightClass="h-11" onClick={() => setShowPhoto(true)} />

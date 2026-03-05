@@ -1,5 +1,5 @@
 // src/api.ts
-import type { Field, FieldDataResponse, Worker } from "./types";
+import type { Field, FieldDataResponse, SensorHealthStatus, Worker } from "./types";
 
 const isAbortError = (e: unknown): boolean => {
     return e instanceof DOMException && e.name === "AbortError";
@@ -13,14 +13,31 @@ export const fetchFields = async (signal?: AbortSignal): Promise<Field[]> => {
         field_id?: number | string;
         field_name?: string;
         owner_id?: string;
+        sensor_status?: number | string | null;
+        sensor_alert_flags?: number | string | null;
         lat?: number | string;
         lon?: number | string;
         waterlevel?: number | string | null;
         temperature?: number | string | null;
+        sensor_latest_dtcrc?: string | null;
+        sensor_no_data?: boolean | number | string | null;
+        sensor_is_stale?: boolean | number | string | null;
+        sensor_is_all_zero?: boolean | number | string | null;
+        sensor_is_same_as_prev?: boolean | number | string | null;
+        sensor_health?: string | null;
     };
     type ApiRequest = {
         target_field_id?: number | string | null;
     };
+
+    const SENSOR_ALERT_NO_DATA = 1;
+    const SENSOR_ALERT_STALE = 1 << 1;
+    const SENSOR_ALERT_ALL_ZERO = 1 << 2;
+    const SENSOR_ALERT_SAME_AS_PREV = 1 << 3;
+    const SENSOR_ALERT_SUB_BATTERY1_LOW = 1 << 4;
+    const SENSOR_ALERT_SUB_BATTERY2_LOW = 1 << 5;
+    const SENSOR_ALERT_WATERLEVEL_DAY_DROP = 1 << 6;
+    const SENSOR_ALERT_WATERLEVEL_1H_RISE = 1 << 7;
 
     const toNumberOrUndef = (v: unknown): number | undefined => {
         if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -29,6 +46,32 @@ export const fetchFields = async (signal?: AbortSignal): Promise<Field[]> => {
             if (Number.isFinite(n)) return n;
         }
         return undefined;
+    };
+
+    const toBooleanOrUndef = (v: unknown): boolean | undefined => {
+        if (typeof v === "boolean") return v;
+        if (typeof v === "number") return v !== 0;
+        if (typeof v === "string") {
+            const normalized = v.trim().toLowerCase();
+            if (normalized === "true" || normalized === "1") return true;
+            if (normalized === "false" || normalized === "0") return false;
+        }
+        return undefined;
+    };
+
+    const toSensorHealthStatus = (v: unknown): SensorHealthStatus | undefined => {
+        if (typeof v !== "string") return undefined;
+        const normalized = v.trim().toLowerCase();
+        switch (normalized) {
+            case "ok":
+            case "no_data":
+            case "stale":
+            case "all_zero":
+            case "same_as_prev":
+                return normalized;
+            default:
+                return undefined;
+        }
     };
 
     const rows = (await res.json()) as ApiField[];
@@ -57,14 +100,60 @@ export const fetchFields = async (signal?: AbortSignal): Promise<Field[]> => {
             const id = row.field_id == null ? "" : String(row.field_id);
             const lat = toNumberOrUndef(row.lat) ?? 0;
             const lon = toNumberOrUndef(row.lon) ?? 0;
+            const rawSensorStatus = toNumberOrUndef(row.sensor_status);
+            const sensorStatus = rawSensorStatus === 1 || rawSensorStatus === 2 || rawSensorStatus === 3 || rawSensorStatus === 4
+                ? rawSensorStatus
+                : undefined;
             const waterMm = toNumberOrUndef(row.waterlevel ?? undefined);
             const temp = toNumberOrUndef(row.temperature ?? undefined);
             const waterCm = waterMm == null ? undefined : waterMm / 10;
 
+            const latestMs = row.sensor_latest_dtcrc == null
+                ? undefined
+                : Date.parse(row.sensor_latest_dtcrc);
+            const sensorAlertFlagsRaw = toNumberOrUndef(row.sensor_alert_flags ?? undefined);
+            const sensorAlertFlags = sensorAlertFlagsRaw == null
+                ? undefined
+                : Math.max(0, Math.trunc(sensorAlertFlagsRaw));
+            // 新旧 API を両立するため、flags が来ない時だけ旧項目へフォールバックする。
+            const hasFlagSource = sensorAlertFlags != null;
+            const hasFlag = (bit: number): boolean => sensorAlertFlags != null && (sensorAlertFlags & bit) !== 0;
+            const sensorNoData = hasFlagSource
+                ? hasFlag(SENSOR_ALERT_NO_DATA)
+                : (toBooleanOrUndef(row.sensor_no_data) ?? false);
+            const sensorIsStale = hasFlagSource
+                ? hasFlag(SENSOR_ALERT_STALE)
+                : (toBooleanOrUndef(row.sensor_is_stale) ?? false);
+            const sensorIsAllZero = hasFlagSource
+                ? hasFlag(SENSOR_ALERT_ALL_ZERO)
+                : (toBooleanOrUndef(row.sensor_is_all_zero) ?? false);
+            const sensorIsSameAsPrev = hasFlagSource
+                ? hasFlag(SENSOR_ALERT_SAME_AS_PREV)
+                : (toBooleanOrUndef(row.sensor_is_same_as_prev) ?? false);
+            const sensorSubBattery1Low = hasFlagSource && hasFlag(SENSOR_ALERT_SUB_BATTERY1_LOW);
+            const sensorSubBattery2Low = hasFlagSource && hasFlag(SENSOR_ALERT_SUB_BATTERY2_LOW);
+            const sensorWaterLevelDayDrop = hasFlagSource && hasFlag(SENSOR_ALERT_WATERLEVEL_DAY_DROP);
+            const sensorWaterLevel1hRise = hasFlagSource && hasFlag(SENSOR_ALERT_WATERLEVEL_1H_RISE);
+            const sensorHealthStatus = toSensorHealthStatus(row.sensor_health) ??
+                (sensorNoData
+                    ? "no_data"
+                    : sensorIsStale
+                        ? "stale"
+                        : sensorIsAllZero
+                            ? "all_zero"
+                            : sensorIsSameAsPrev
+                                ? "same_as_prev"
+                                : "ok");
+
             let pinAlert: "none" | "!" | "!!!" = "none";
+            // 地図ピンは従来の判定を維持し、センサー健全性の警告はステータスカード側で示す。
             if (waterCm == null || temp == null) {
                 pinAlert = "!!!";
-            } else if (waterCm < 2 || waterCm > 25 || temp < 5 || temp > 35) {
+            } else if (
+                waterCm != null &&
+                temp != null &&
+                (waterCm < 2 || waterCm > 25 || temp < 5 || temp > 35)
+            ) {
                 pinAlert = "!";
             }
             if (activeRequestFieldIDs.has(id)) {
@@ -76,8 +165,21 @@ export const fetchFields = async (signal?: AbortSignal): Promise<Field[]> => {
                 name: (row.field_name ?? "").trim() || id,
                 lat,
                 lon,
+                sensorStatus,
                 ownerName: (row.owner_id ?? "").trim() || undefined,
                 pinAlert,
+                sensorHealth: {
+                    status: sensorHealthStatus,
+                    latestMs: Number.isFinite(latestMs) ? latestMs : undefined,
+                    noData: sensorNoData,
+                    stale: sensorIsStale,
+                    allZero: sensorIsAllZero,
+                    sameAsPrev: sensorIsSameAsPrev,
+                    subBattery1Low: sensorSubBattery1Low,
+                    subBattery2Low: sensorSubBattery2Low,
+                    waterlevelDayDrop: sensorWaterLevelDayDrop,
+                    waterlevel1hRise: sensorWaterLevel1hRise,
+                },
             } satisfies Field;
         })
         .filter((f) => f.id !== "");

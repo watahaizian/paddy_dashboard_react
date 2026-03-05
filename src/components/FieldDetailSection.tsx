@@ -118,6 +118,7 @@ const FieldDetailSection = ({
           <ChartsAndStatusPanel
             padId={field.id}
             fieldName={field.name}
+            field={field}
             data={data}
             loading={loading}
             error={error}
@@ -136,6 +137,7 @@ const FieldDetailSection = ({
         <ChartsAndStatusPanel
           padId={field.id}
           fieldName={field.name}
+          field={field}
           data={data}
           loading={loading}
           error={error}

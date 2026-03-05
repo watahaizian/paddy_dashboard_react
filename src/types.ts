@@ -1,10 +1,27 @@
+export type SensorHealthStatus = "ok" | "no_data" | "stale" | "all_zero" | "same_as_prev";
+
+export type SensorHealth = {
+    status: SensorHealthStatus;
+    latestMs?: number;
+    noData: boolean;
+    stale: boolean;
+    allZero: boolean;
+    sameAsPrev: boolean;
+    subBattery1Low: boolean;
+    subBattery2Low: boolean;
+    waterlevelDayDrop: boolean;
+    waterlevel1hRise: boolean;
+};
+
 export type Field = {
     id: string;
     name: string;
     lat: number;
     lon: number;
+    sensorStatus?: 1 | 2 | 3 | 4;
     ownerName?: string;
     pinAlert?: "none" | "!" | "!!!";
+    sensorHealth?: SensorHealth;
 };
 
 export type Point = {
