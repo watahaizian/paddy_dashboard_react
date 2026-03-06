@@ -24,12 +24,22 @@ export type MonitorTarget = {
 };
 
 export type Field = MonitorTarget & {
+  areaId?: number;
   ownerName?: string;
 };
 
 export type UnassignedSensor = MonitorTarget & {
   sensorId: number;
   lfourId?: string;
+};
+
+export type AreaSummary = {
+  areaId: number;
+  areaName: string;
+  localGovernmentCode?: string;
+  areaWeather?: 1 | 2 | 3;
+  areaTemp?: number;
+  area12Rain?: number;
 };
 
 export type Point = {

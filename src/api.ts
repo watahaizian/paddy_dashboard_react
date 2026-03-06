@@ -1,4 +1,5 @@
 ﻿import type {
+  AreaSummary,
   Field,
   FieldDataResponse,
   SensorHealth,
@@ -112,6 +113,7 @@ type ApiField = ApiSensorState & {
   field_id?: number | string;
   field_name?: string;
   owner_id?: string;
+  area_id?: number | string | null;
   lat?: number | string;
   lon?: number | string;
   waterlevel?: number | string | null;
@@ -127,6 +129,15 @@ type ApiUnassignedSensor = ApiSensorState & {
 
 type ApiRequest = {
   target_field_id?: number | string | null;
+};
+
+type ApiAreaSummary = {
+  area_id?: number | string;
+  area_name?: string;
+  local_government_code?: string | null;
+  area_weather?: number | string | null;
+  area_temp?: number | string | null;
+  area_12rain?: number | string | null;
 };
 
 export const fetchFields = async (signal?: AbortSignal): Promise<Field[]> => {
@@ -183,6 +194,7 @@ export const fetchFields = async (signal?: AbortSignal): Promise<Field[]> => {
         name: (row.field_name ?? "").trim() || id,
         lat,
         lon,
+        areaId: toNumberOrUndef(row.area_id ?? undefined),
         sensorStatus,
         ownerName: (row.owner_id ?? "").trim() || undefined,
         pinAlert,
@@ -220,6 +232,33 @@ export const fetchUnassignedSensors = async (signal?: AbortSignal): Promise<Unas
       pinAlert: "none",
       sensorHealth: buildSensorHealth(row),
     } satisfies UnassignedSensor];
+  });
+};
+
+export const fetchAreas = async (signal?: AbortSignal): Promise<AreaSummary[]> => {
+  const res = await fetch("/api/areas", { signal });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const rows = (await res.json()) as ApiAreaSummary[];
+  return rows.flatMap((row) => {
+    const areaId = toNumberOrUndef(row.area_id);
+    if (areaId == null) {
+      return [];
+    }
+
+    const weatherRaw = toNumberOrUndef(row.area_weather ?? undefined);
+    const areaWeather = weatherRaw === 1 || weatherRaw === 2 || weatherRaw === 3
+      ? weatherRaw
+      : undefined;
+
+    return [{
+      areaId,
+      areaName: (row.area_name ?? "").trim() || String(areaId),
+      localGovernmentCode: (row.local_government_code ?? "").trim() || undefined,
+      areaWeather,
+      areaTemp: toNumberOrUndef(row.area_temp ?? undefined),
+      area12Rain: toNumberOrUndef(row.area_12rain ?? undefined),
+    } satisfies AreaSummary];
   });
 };
 

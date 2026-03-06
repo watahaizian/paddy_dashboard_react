@@ -1,15 +1,16 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { MapContainer, Marker, Polygon, TileLayer, Tooltip, useMapEvents } from "react-leaflet";
-import { FaSun, FaThermometerHalf, FaTint } from "react-icons/fa";
+import { FaCloud, FaCloudRain, FaSun, FaThermometerHalf, FaTint } from "react-icons/fa";
 import L from "leaflet";
 import {
+  fetchAreas,
   fetchPolygonLocalGovernments,
   fetchPolygons,
   type LocalGovernment,
   type PolygonApiRow,
 } from "../api";
-import type { Field, UnassignedSensor } from "../types";
+import type { AreaSummary, Field, UnassignedSensor } from "../types";
 
 type Props = {
   fields: Field[];
@@ -35,6 +36,7 @@ type ActiveScope = {
 
 const minPolygonZoom = 15;
 const EMPTY_LOCAL_GOVERNMENTS: LocalGovernment[] = [];
+const EMPTY_AREAS: AreaSummary[] = [];
 
 const toErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -51,6 +53,32 @@ const formatDateTime = (ms?: number) => {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(ms));
+};
+
+const weatherLabel = (weather?: 1 | 2 | 3) => {
+  switch (weather) {
+    case 1:
+      return "晴れ";
+    case 2:
+      return "くもり";
+    case 3:
+      return "雨";
+    default:
+      return "--";
+  }
+};
+
+const weatherIcon = (weather?: 1 | 2 | 3) => {
+  switch (weather) {
+    case 1:
+      return <FaSun style={{ color: "#F6C84C" }} size={18} />;
+    case 2:
+      return <FaCloud style={{ color: "#78909C" }} size={18} />;
+    case 3:
+      return <FaCloudRain style={{ color: "#1F88E5" }} size={18} />;
+    default:
+      return <FaSun style={{ color: "#F6C84C" }} size={18} />;
+  }
 };
 
 const pin = (color: string, size: number, alert: "none" | "!" | "!!!" = "none") => {
@@ -171,6 +199,7 @@ const MapSection = ({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [unassignedPanelOpen, setUnassignedPanelOpen] = useState(false);
   const [selectedPrefectureCode, setSelectedPrefectureCode] = useState("");
+  const [selectedMunicipalityCode, setSelectedMunicipalityCode] = useState("");
   const [enabledMunicipalityCodes, setEnabledMunicipalityCodes] = useState<string[]>([]);
   const [view, setView] = useState<{ bounds: L.LatLngBounds; zoom: number } | null>(null);
 
@@ -183,9 +212,16 @@ const MapSection = ({
     () => localGovernmentsQuery.data ?? EMPTY_LOCAL_GOVERNMENTS,
     [localGovernmentsQuery.data],
   );
+  const areasQuery = useQuery({
+    queryKey: ["areas"],
+    queryFn: ({ signal }) => fetchAreas(signal),
+    staleTime: 30_000,
+  });
+  const areas = useMemo(() => areasQuery.data ?? EMPTY_AREAS, [areasQuery.data]);
   const localGovernmentError = localGovernmentsQuery.error
     ? toErrorMessage(localGovernmentsQuery.error)
     : null;
+  const areaError = areasQuery.error ? toErrorMessage(areasQuery.error) : null;
 
   const prefectureOptions = useMemo(() => {
     const byCode = new Map<string, string>();
@@ -217,6 +253,13 @@ const MapSection = ({
       .filter((row) => row.prefecture_code === effectiveSelectedPrefectureCode)
       .sort((a, b) => a.local_government_code.localeCompare(b.local_government_code));
   }, [effectiveSelectedPrefectureCode, localGovernments]);
+
+  useEffect(() => {
+    if (municipalityOptions.some((row) => row.local_government_code === selectedMunicipalityCode)) {
+      return;
+    }
+    setSelectedMunicipalityCode(municipalityOptions[0]?.local_government_code ?? "");
+  }, [municipalityOptions, selectedMunicipalityCode]);
 
   const activeScopes = useMemo<ActiveScope[]>(() => {
     return enabledMunicipalityCodes.map((code) => ({
@@ -308,6 +351,7 @@ const MapSection = ({
       if (prev.includes(localGovernmentCode)) {
         return prev.filter((code) => code !== localGovernmentCode);
       }
+      setSelectedMunicipalityCode(localGovernmentCode);
       return [...prev, localGovernmentCode];
     });
   };
@@ -319,6 +363,42 @@ const MapSection = ({
   const selectedField = fields.find((field) => field.id === selectedFieldId) ?? null;
   const selectedSensor = unassignedSensors.find((sensor) => sensor.id === selectedSensorId) ?? null;
   const centerTarget = selectedSensor ?? selectedField ?? fields[0] ?? unassignedSensors[0] ?? null;
+  const selectedArea = useMemo(() => {
+    if (selectedField?.areaId == null) {
+      return null;
+    }
+    return areas.find((area) => area.areaId === selectedField.areaId) ?? null;
+  }, [areas, selectedField]);
+  const activeMunicipalityCode = selectedArea?.localGovernmentCode
+    ?? selectedMunicipalityCode
+    ?? "";
+  const activeLocalGovernment = activeMunicipalityCode
+    ? municipalityOptions.find((row) => row.local_government_code === activeMunicipalityCode)
+    ?? localGovernments.find((row) => row.local_government_code === activeMunicipalityCode)
+    ?? null
+    : null;
+  const activeAreaWeather = activeMunicipalityCode
+    ? areas.find((area) => area.localGovernmentCode === activeMunicipalityCode) ?? null
+    : null;
+  const hasAreaSnapshotTarget = activeLocalGovernment != null || activeAreaWeather != null;
+  const areaDisplay = activeLocalGovernment
+    ? `${activeLocalGovernment.prefecture_name} / ${activeLocalGovernment.municipality_name || activeLocalGovernment.local_government_name}`
+    : "--";
+  const weatherDisplay = activeAreaWeather?.areaWeather != null
+    ? weatherLabel(activeAreaWeather.areaWeather)
+    : hasAreaSnapshotTarget
+      ? "未同期"
+      : "--";
+  const tempDisplay = activeAreaWeather?.areaTemp != null
+    ? `${activeAreaWeather.areaTemp.toFixed(1)} ℃`
+    : hasAreaSnapshotTarget
+      ? "未同期"
+      : "--";
+  const rainDisplay = activeAreaWeather?.area12Rain != null
+    ? `${activeAreaWeather.area12Rain.toFixed(1)} mm`
+    : hasAreaSnapshotTarget
+      ? "未同期"
+      : "--";
 
   if (centerTarget == null) {
     return (
@@ -353,23 +433,26 @@ const MapSection = ({
           padding: "10px 14px",
           fontWeight: 700,
           display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr 1fr",
+          gridTemplateColumns: "minmax(0, 1.8fr) repeat(3, minmax(0, 1fr))",
           gap: 12,
         }}
       >
-        <div>エリア</div>
-        <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <FaSun style={{ color: "#F6C84C" }} size={18} />
-          <span>天気</span>
-        </div>
-        <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <FaThermometerHalf style={{ color: "#E53935" }} size={16} />
-          <span>気温</span>
-        </div>
-        <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <FaTint style={{ color: "#1F88E5" }} size={16} />
-          <span>12時間降水量</span>
-        </div>
+        <HeaderCell label="エリア" value={areaDisplay} />
+        <HeaderCell
+          label="天気"
+          value={weatherDisplay}
+          icon={weatherIcon(activeAreaWeather?.areaWeather)}
+        />
+        <HeaderCell
+          label="気温"
+          value={tempDisplay}
+          icon={<FaThermometerHalf style={{ color: "#E53935" }} size={16} />}
+        />
+        <HeaderCell
+          label="12時間降水量"
+          value={rainDisplay}
+          icon={<FaTint style={{ color: "#1F88E5" }} size={16} />}
+        />
       </div>
 
       <div style={{ borderTop: "1px solid #BFCBDA", height: "calc(100% - 44px)", position: "relative" }}>
@@ -548,6 +631,11 @@ const MapSection = ({
                 自治体一覧取得エラー: {localGovernmentError}
               </div>
             )}
+            {areaError && (
+              <div style={{ fontSize: 12, color: "#C62828", marginBottom: 10 }}>
+                天気情報取得エラー: {areaError}
+              </div>
+            )}
 
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: "block", fontSize: 12, color: "#4A657F", marginBottom: 4 }}>都道府県</label>
@@ -645,7 +733,12 @@ const MapSection = ({
                       checked={checked}
                       onChange={() => toggleMunicipality(municipality.local_government_code)}
                     />
-                    <span style={{ fontSize: 13 }}>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: municipality.local_government_code === activeMunicipalityCode ? 700 : 400,
+                      }}
+                    >
                       {municipality.municipality_name || municipality.local_government_name}
                     </span>
                   </label>
@@ -715,3 +808,52 @@ const MapSection = ({
 };
 
 export default MapSection;
+
+const HeaderCell = ({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon?: ReactNode;
+}) => {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 12,
+          color: "#4A657F",
+          minWidth: 0,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div
+        style={{
+          fontSize: 15,
+          color: "#1F2D3A",
+          flexShrink: 1,
+          minWidth: 0,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+};
