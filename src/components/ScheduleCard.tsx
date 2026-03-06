@@ -1,5 +1,4 @@
-// src/components/ScheduleCard.tsx
-import SectionTitle from "./SectionTitle.tsx";
+﻿import SectionTitle from "./SectionTitle";
 
 const ScheduleCard = () => {
   return (
@@ -12,6 +11,7 @@ const ScheduleCard = () => {
     </div>
   );
 };
+
 export default ScheduleCard;
 
 const Entry = ({ date, action, person }: { date: string; action: string; person: string }) => {

@@ -1,5 +1,4 @@
-// src/components/PhotoModal.tsx
-type Props = {
+﻿type Props = {
   imageUrl?: string;
   onClose: () => void;
 };
@@ -12,7 +11,7 @@ const PhotoModal = ({ imageUrl, onClose }: Props) => {
           onClick={onClose}
           className="absolute -top-10 right-0 text-white p-2 hover:text-gray-300"
         >
-          閉じる ✕
+          閉じる
         </button>
         {imageUrl ? (
           <img

@@ -1,9 +1,8 @@
-// src/components/FieldDetailSection.tsx
-import type { Field, FieldDataResponse } from "../types";
-import ChartsAndStatusPanel from "./ChartsAndStatusPanel.tsx";
-import ScheduleCard from "./ScheduleCard.tsx";
-import ActivityLogCard from "./ActivityLogCard.tsx";
-import InfoCard from "./InfoCard.tsx";
+﻿import type { Field, FieldDataResponse } from "../types";
+import ChartsAndStatusPanel from "./ChartsAndStatusPanel";
+import ScheduleCard from "./ScheduleCard";
+import ActivityLogCard from "./ActivityLogCard";
+import InfoCard from "./InfoCard";
 
 type Props = {
   isCompact: boolean;
@@ -116,9 +115,8 @@ const FieldDetailSection = ({
       <div className="space-y-3">
         <div className="h-auto">
           <ChartsAndStatusPanel
-            padId={field.id}
-            fieldName={field.name}
-            field={field}
+            title={field.name}
+            target={field}
             data={data}
             loading={loading}
             error={error}
@@ -135,9 +133,8 @@ const FieldDetailSection = ({
     <div className="space-y-3">
       <div className="min-h-[360px] min-w-0">
         <ChartsAndStatusPanel
-          padId={field.id}
-          fieldName={field.name}
-          field={field}
+          title={field.name}
+          target={field}
           data={data}
           loading={loading}
           error={error}

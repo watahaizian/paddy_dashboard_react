@@ -1,5 +1,4 @@
-// src/components/WorkerDataSection.tsx
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchWorkers } from "../api";
 import type { Worker } from "../types";
@@ -51,27 +50,27 @@ const WorkerDataSection = () => {
           <div className="text-slate-500 text-sm">作業員データがありません</div>
         ) : (
           <div className="divide-y">
-            {workers.map((w) => (
+            {workers.map((worker) => (
               <button
-                key={w.id}
+                key={worker.id}
                 type="button"
-                onClick={() => setSelectedWorker(w)}
+                onClick={() => setSelectedWorker(worker)}
                 className="w-full text-left flex items-center gap-3 py-2 hover:bg-slate-50 rounded-lg px-1 transition-colors"
               >
                 <img
-                  src={w.photoUrl}
-                  alt={w.name}
+                  src={worker.photoUrl}
+                  alt={worker.name}
                   className="w-10 h-10 rounded-full object-cover border border-slate-200"
                 />
                 <div className="flex-1 grid grid-cols-4 gap-3 text-sm items-center">
-                  <div className="font-semibold text-slate-800">{w.name}</div>
-                  <div className="text-slate-600">{w.area}</div>
-                  <div className="text-slate-600">{w.method}</div>
+                  <div className="font-semibold text-slate-800">{worker.name}</div>
+                  <div className="text-slate-600">{worker.area}</div>
+                  <div className="text-slate-600">{worker.method}</div>
                   <div>
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${onlineBadgeClass(w.isOnline)}`}
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${onlineBadgeClass(worker.isOnline)}`}
                     >
-                      {onlineLabel(w.isOnline)}
+                      {onlineLabel(worker.isOnline)}
                     </span>
                   </div>
                 </div>
@@ -83,7 +82,7 @@ const WorkerDataSection = () => {
 
       {visibleSelectedWorker != null && (
         <div className="absolute inset-0 z-20 flex items-center justify-center p-3">
-          {/* 画面全体ではなく作業員データ枠内に閉じたモーダルにするため、セクション内絶対配置にする。 */}
+          {/* 一覧を崩さず詳細だけ重ねるため、カード内モーダルにしている。 */}
           <button
             type="button"
             aria-label="モーダルを閉じる"
@@ -126,15 +125,11 @@ const WorkerDataSection = () => {
               </div>
               <div className="grid grid-cols-[110px_1fr] gap-2">
                 <div className="text-slate-500">メールアドレス</div>
-                <div className="text-slate-800">
-                  {visibleSelectedWorker.contactEmail || "未設定"}
-                </div>
+                <div className="text-slate-800">{visibleSelectedWorker.contactEmail || "未設定"}</div>
               </div>
               <div className="grid grid-cols-[110px_1fr] gap-2">
                 <div className="text-slate-500">電話番号</div>
-                <div className="text-slate-800">
-                  {visibleSelectedWorker.contactPhone || "未設定"}
-                </div>
+                <div className="text-slate-800">{visibleSelectedWorker.contactPhone || "未設定"}</div>
               </div>
             </div>
           </div>

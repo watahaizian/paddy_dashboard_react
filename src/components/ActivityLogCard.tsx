@@ -1,4 +1,4 @@
-import SectionTitle from "./SectionTitle.tsx";
+﻿import SectionTitle from "./SectionTitle";
 
 const ActivityLogCard = () => {
   return (
@@ -12,6 +12,7 @@ const ActivityLogCard = () => {
     </div>
   );
 };
+
 export default ActivityLogCard;
 
 const Entry = ({ date, action, person }: { date: string; action: string; person: string }) => {

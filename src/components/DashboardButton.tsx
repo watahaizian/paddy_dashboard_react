@@ -1,9 +1,7 @@
-// src/components/DashboardButton.tsx
-
-type Props = {
+﻿type Props = {
   label: string;
   heightClass?: string;
-  onClick?: () => void; // クリックイベントを受け取れるように追加
+  onClick?: () => void;
 };
 
 const DashboardButton = ({

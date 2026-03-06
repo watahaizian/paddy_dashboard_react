@@ -1,5 +1,4 @@
-// src/components/DataDetailModal.tsx
-import type { FieldDataResponse } from "../types";
+﻿import type { FieldDataResponse } from "../types";
 
 type Props = {
   data: FieldDataResponse | null;
@@ -9,12 +8,11 @@ type Props = {
 const DataDetailModal = ({ data, onClose }: Props) => {
   if (!data || !data.points) return null;
 
-  // 日付のフォーマット用関数
   const formatDate = (t?: number | string) => {
-    if (t == null) return '-';
-    const d = typeof t === 'number' ? new Date(t) : new Date(String(t));
-    if (Number.isNaN(d.getTime())) return '-';
-    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+    if (t == null) return "-";
+    const d = typeof t === "number" ? new Date(t) : new Date(String(t));
+    if (Number.isNaN(d.getTime())) return "-";
+    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${d.getMinutes().toString().padStart(2, "0")}`;
   };
 
   return (
@@ -26,7 +24,7 @@ const DataDetailModal = ({ data, onClose }: Props) => {
         <div className="p-4 border-b flex justify-between items-center bg-slate-50">
           <h3 className="font-bold text-lg text-slate-700">データ詳細</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full text-slate-500">
-            ✕
+            閉じる
           </button>
         </div>
 
@@ -43,10 +41,8 @@ const DataDetailModal = ({ data, onClose }: Props) => {
               {[...data.points].reverse().map((point, index) => (
                 <tr key={index} className="bg-white border-b hover:bg-slate-50">
                   <td className="px-6 py-4">{formatDate(point.t ?? point.measured)}</td>
-                  <td className="px-6 py-4">{point.waterCm != null ? point.waterCm.toFixed(1) : '-'}</td>
-                  <td className="px-6 py-4 text-orange-600">
-                    {point.temp != null ? point.temp.toFixed(1) : '-'}
-                  </td>
+                  <td className="px-6 py-4">{point.waterCm != null ? point.waterCm.toFixed(1) : "-"}</td>
+                  <td className="px-6 py-4 text-orange-600">{point.temp != null ? point.temp.toFixed(1) : "-"}</td>
                 </tr>
               ))}
             </tbody>

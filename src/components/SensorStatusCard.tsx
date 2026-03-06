@@ -1,9 +1,8 @@
-﻿// src/components/SensorStatusCard.tsx
-import { useEffect, useMemo, useState } from "react";
-import type { Field, FieldDataResponse } from "../types";
+﻿import { useEffect, useMemo, useState } from "react";
+import type { FieldDataResponse, MonitorTarget } from "../types";
 
 type Props = {
-  field: Field;
+  target: MonitorTarget;
   data: FieldDataResponse | null;
   loading: boolean;
   error: string | null;
@@ -20,10 +19,10 @@ const fmtDateTime = (ms?: number) => {
   }).format(new Date(ms));
 };
 
-const SensorStatusCard = ({ field, data, loading, error }: Props) => {
+const SensorStatusCard = ({ target, data, loading, error }: Props) => {
   const [modalOpen, setModalOpen] = useState(false);
   const last = data?.last;
-  const sensorHealth = field.sensorHealth;
+  const sensorHealth = target.sensorHealth;
   const latestMs = sensorHealth?.latestMs ?? last?.t;
 
   const alertDetails = useMemo(() => {
@@ -39,15 +38,14 @@ const SensorStatusCard = ({ field, data, loading, error }: Props) => {
     return details;
   }, [sensorHealth]);
 
-  const hasAlert = field.sensorStatus === 4 || alertDetails.length > 0;
+  const hasAlert = target.sensorStatus === 4 || alertDetails.length > 0;
   const hasMultipleAlerts = alertDetails.length >= 2;
-  // 異常理由が1件の時は即読できるように理由まで1行で出す。
   const singleAlertText = alertDetails.length === 1
     ? `センサ状態が異常です（${alertDetails[0]}）`
     : "センサ状態が異常です";
 
   useEffect(() => {
-    // 異常件数が減ったときに古いモーダル表示が残らないようにする。
+    // 異常件数が減った後に詳細だけ残らないようにする。
     if (!hasMultipleAlerts) {
       setModalOpen(false);
     }
@@ -64,18 +62,9 @@ const SensorStatusCard = ({ field, data, loading, error }: Props) => {
         ) : (
           <>
             <Row label="最終受信" value={fmtDateTime(latestMs)} />
-            <Row
-              label="水位"
-              value={last?.waterCm != null ? `${last.waterCm.toFixed(1)} cm` : "--"}
-            />
-            <Row
-              label="水温"
-              value={last?.temp != null ? `${last.temp.toFixed(1)} ℃` : "--"}
-            />
-            <Row
-              label="電池残量"
-              value={last?.battery != null ? `${last.battery.toFixed(0)} %` : "--"}
-            />
+            <Row label="水位" value={last?.waterCm != null ? `${last.waterCm.toFixed(1)} cm` : "--"} />
+            <Row label="水温" value={last?.temp != null ? `${last.temp.toFixed(1)} ℃` : "--"} />
+            <Row label="電池残量" value={last?.battery != null ? `${last.battery.toFixed(0)} %` : "--"} />
             {hasAlert && (
               <div className="pt-1 space-y-1">
                 {!hasMultipleAlerts ? (
@@ -83,22 +72,18 @@ const SensorStatusCard = ({ field, data, loading, error }: Props) => {
                     {singleAlertText}
                   </div>
                 ) : (
-                  <div className="space-y-1">
-                    {/* 複数件はカード内モーダルにして、通常時の可読性を維持する。 */}
-                    <button
-                      type="button"
-                      className="w-full text-left text-[12px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1 hover:bg-red-100 transition cursor-pointer"
-                      onClick={() => setModalOpen(true)}
-                    >
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="leading-tight">センサ状態が異常です（{alertDetails.length}件）</span>
-                        {/* 右端に押下の意図を示すことで、文言を増やさず操作性を上げる。 */}
-                        <span className="shrink-0 text-[12px] leading-none underline decoration-red-500 decoration-1 underline-offset-2">
-                          &gt;
-                        </span>
+                  <button
+                    type="button"
+                    className="w-full text-left text-[12px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1 hover:bg-red-100 transition cursor-pointer"
+                    onClick={() => setModalOpen(true)}
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="leading-tight">センサ状態が異常です（{alertDetails.length}件）</span>
+                      <span className="shrink-0 text-[12px] leading-none underline decoration-red-500 decoration-1 underline-offset-2">
+                        &gt;
                       </span>
-                    </button>
-                  </div>
+                    </span>
+                  </button>
                 )}
               </div>
             )}
@@ -140,6 +125,7 @@ const SensorStatusCard = ({ field, data, loading, error }: Props) => {
     </div>
   );
 };
+
 export default SensorStatusCard;
 
 const Row = ({ label, value }: { label: string; value: string }) => {

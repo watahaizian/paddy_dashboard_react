@@ -1,5 +1,4 @@
-// src/components/BottomSummarySection.tsx
-import { useState } from "react";
+﻿import { useState } from "react";
 
 type Props = { isCompact: boolean };
 
@@ -19,12 +18,12 @@ const BottomSummarySection = ({ isCompact }: Props) => {
   if (isCompact) {
     return (
       <div className="h-full grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-        {cards.map((c) => (
+        {cards.map((card) => (
           <SummaryCard
-            key={c.title}
-            title={c.title}
-            items={c.items}
-            onClick={() => setActiveCard(c)}
+            key={card.title}
+            title={card.title}
+            items={card.items}
+            onClick={() => setActiveCard(card)}
           />
         ))}
         {activeCard && (
@@ -40,12 +39,12 @@ const BottomSummarySection = ({ isCompact }: Props) => {
 
   return (
     <div className="h-full grid grid-cols-4 gap-4">
-      {cards.map((c) => (
+      {cards.map((card) => (
         <SummaryCard
-          key={c.title}
-          title={c.title}
-          items={c.items}
-          onClick={() => setActiveCard(c)}
+          key={card.title}
+          title={card.title}
+          items={card.items}
+          onClick={() => setActiveCard(card)}
         />
       ))}
       {activeCard && (
@@ -58,6 +57,7 @@ const BottomSummarySection = ({ isCompact }: Props) => {
     </div>
   );
 };
+
 export default BottomSummarySection;
 
 const SummaryCard = ({
@@ -77,8 +77,8 @@ const SummaryCard = ({
     >
       <div className="font-bold">{title}</div>
       <div className="mt-3 flex-1 border rounded-xl bg-slate-50 p-3 flex flex-col justify-center gap-2">
-        {items.map((it) => (
-          <div key={it}>{it}</div>
+        {items.map((item) => (
+          <div key={item}>{item}</div>
         ))}
       </div>
     </button>
@@ -120,9 +120,9 @@ const SummaryModal = ({
             </div>
           ) : (
             <ul className="space-y-2 text-slate-700">
-              {items.map((it) => (
-                <li key={it} className="border rounded-lg px-3 py-2 bg-slate-50">
-                  {it}
+              {items.map((item) => (
+                <li key={item} className="border rounded-lg px-3 py-2 bg-slate-50">
+                  {item}
                 </li>
               ))}
             </ul>

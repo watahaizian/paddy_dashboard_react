@@ -1,5 +1,4 @@
-// src/components/ChartCard.tsx
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import type { FieldDataResponse } from "../types";
 import {
   AreaChart,
@@ -10,8 +9,6 @@ import {
   Tooltip as RTooltip,
   ResponsiveContainer,
 } from "recharts";
-
-
 
 type Kind = "waterCm" | "temp";
 
@@ -45,7 +42,9 @@ const ySpec = (kind: Kind) => {
 type XDomain = readonly [number, number] | readonly ["dataMin", "dataMax"];
 
 const make3HourTicks = (timesMs: number[]): { ticks: number[]; domain: XDomain } => {
-  if (timesMs.length === 0) return { ticks: [] as number[], domain: ["dataMin", "dataMax"] as const };
+  if (timesMs.length === 0) {
+    return { ticks: [], domain: ["dataMin", "dataMax"] };
+  }
 
   const min = Math.min(...timesMs);
   const max = Math.max(...timesMs);
@@ -56,8 +55,7 @@ const make3HourTicks = (timesMs: number[]): { ticks: number[]; domain: XDomain }
 
   const end = new Date(max);
   end.setMinutes(0, 0, 0);
-  const eh = end.getHours();
-  const ceil = Math.ceil(eh / 3) * 3;
+  const ceil = Math.ceil(end.getHours() / 3) * 3;
   if (ceil >= 24) {
     end.setHours(24, 0, 0, 0);
   } else {
@@ -69,7 +67,7 @@ const make3HourTicks = (timesMs: number[]): { ticks: number[]; domain: XDomain }
     ticks.push(t);
   }
 
-  return { ticks, domain: [start.getTime(), end.getTime()] as const };
+  return { ticks, domain: [start.getTime(), end.getTime()] };
 };
 
 const ChartCard = ({
@@ -85,16 +83,15 @@ const ChartCard = ({
   const lastPoint = points.length > 0 ? points[points.length - 1] : undefined;
   const lastValue = lastPoint ? lastPoint[kind] : undefined;
 
-  const chartData = points.map((p) => ({
-    t: Number(p.t),
-    waterCm: p.waterCm,
-    temp: p.temp,
+  const chartData = points.map((point) => ({
+    t: Number(point.t),
+    waterCm: point.waterCm,
+    temp: point.temp,
   }));
 
   const { stroke, fill } = colors(kind);
   const { min: minY, max: maxY, ticks: yTicks } = ySpec(kind);
-
-  const xTimes = useMemo(() => chartData.map((d) => d.t), [chartData]);
+  const xTimes = useMemo(() => chartData.map((point) => point.t), [chartData]);
   const { ticks: xTicks, domain: xDomain } = useMemo(() => make3HourTicks(xTimes), [xTimes]);
 
   return (
@@ -116,75 +113,66 @@ const ChartCard = ({
           <div className="text-red-600 text-center px-3 text-sm">{error}</div>
         ) : (
           <div className="w-full h-full overflow-hidden">
-            <div className="w-full h-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={chartData}
-                  margin={{ top: 16, right: 16, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-
-                  <XAxis
-                    dataKey="t"
-                    type="number"
-                    scale="time"
-                    domain={xDomain}
-                    ticks={xTicks}
-                    interval={0}
-                    tickFormatter={(v) => fmtHour(Number(v))}
-                    tick={{ fontSize: 11, fill: "#64748b" }}
-                    tickMargin={4}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-
-                  <YAxis
-                    type="number"
-                    domain={[minY, maxY]}
-                    ticks={yTicks}
-                    interval={0}
-                    tick={{ fontSize: 11, fill: "#64748b" }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={44}
-                    tickMargin={4}
-                    allowDataOverflow
-                  />
-
-                  <RTooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "none",
-                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                    }}
-                    labelFormatter={(v) =>
-                      new Intl.DateTimeFormat("ja-JP", {
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }).format(new Date(Number(v)))
-                    }
-                    formatter={(value: string | number | readonly (string | number)[] | undefined) => {
-                      const v = Array.isArray(value) ? value[0] : value ?? NaN;
-                      return [Number(v).toFixed(1) + unit, title];
-                    }}
-                  />
-
-                  <Area
-                    type="monotone"
-                    dataKey={kind}
-                    stroke={stroke}
-                    strokeWidth={2}
-                    fill={fill}
-                    fillOpacity={0.1}
-                    dot={false}
-                    activeDot={{ r: 4, strokeWidth: 0 }}
-                    animationDuration={1000}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis
+                  dataKey="t"
+                  type="number"
+                  scale="time"
+                  domain={xDomain}
+                  ticks={xTicks}
+                  interval={0}
+                  tickFormatter={(value) => fmtHour(Number(value))}
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tickMargin={4}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  type="number"
+                  domain={[minY, maxY]}
+                  ticks={yTicks}
+                  interval={0}
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={44}
+                  tickMargin={4}
+                  allowDataOverflow
+                />
+                <RTooltip
+                  contentStyle={{
+                    borderRadius: "8px",
+                    border: "none",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                  }}
+                  labelFormatter={(value) =>
+                    new Intl.DateTimeFormat("ja-JP", {
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }).format(new Date(Number(value)))
+                  }
+                  formatter={(value: string | number | readonly (string | number)[] | undefined) => {
+                    const normalized = Array.isArray(value) ? value[0] : value ?? NaN;
+                    return [`${Number(normalized).toFixed(1)}${unit}`, title];
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={kind}
+                  stroke={stroke}
+                  strokeWidth={2}
+                  fill={fill}
+                  fillOpacity={0.1}
+                  dot={false}
+                  activeDot={{ r: 4, strokeWidth: 0 }}
+                  animationDuration={1000}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         )}
       </div>
